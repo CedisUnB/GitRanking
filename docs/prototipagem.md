@@ -27,8 +27,8 @@ Nesta fase inicial, exploramos diferentes ideias e conceitos através de sessõe
 
 ---
 
-### 🎨 Acesse o Protótipo
+### Acesse o protótipo
 
 Explore abaixo o protótipo interativo desenvolvido no Figma. O protótipo permite navegar pelos principais fluxos e interações propostos para a solução.
 
-👉 **[Acessar Protótipo no Figma](https://www.figma.com/proto/ort3Dd5P08hU7DmBTX276s/TCC?page-id=102%3A227&node-id=4527-1480&p=f&viewport=381%2C129%2C0.39&t=NOdwKtJL0CRFieJR-1&scaling=contain&content-scaling=fixed&starting-point-node-id=4527%3A1480)**
+👉 **[Acessar protótipo no Figma](https://www.figma.com/proto/ort3Dd5P08hU7DmBTX276s/TCC?page-id=102%3A227&node-id=4527-1480&p=f&viewport=381%2C129%2C0.39&t=NOdwKtJL0CRFieJR-1&scaling=contain&content-scaling=fixed&starting-point-node-id=4527%3A1480)**
