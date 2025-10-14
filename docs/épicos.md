@@ -1,14 +1,14 @@
-# Épicos do Projeto
+# Épicos do projeto
 
 ## Introdução
 
 Este documento apresenta os **épicos** que estruturam o desenvolvimento do projeto. Épicos são grandes blocos de funcionalidades que agrupam features relacionadas e representam objetivos de alto nível do sistema.
 
-### O que são Épicos?
+### O que são épicos?
 
 Épicos são conjuntos de funcionalidades interligadas que entregam valor significativo aos usuários. Cada épico pode ser dividido em features menores e, posteriormente, em histórias de usuário e tarefas específicas durante o processo de desenvolvimento.
 
-### Estrutura dos Épicos
+### Estrutura dos épicos
 
 Cada épico apresentado contém:
 - **Descrição**: O que o épico contempla e qual seu propósito principal
@@ -16,7 +16,7 @@ Cada épico apresentado contém:
 - **Features**: Lista de funcionalidades específicas que compõem o épico
 
 
-## Lista de Épicos
+## Lista de épicos
 
 ### Épico 1 - Autenticação e acesso
 
