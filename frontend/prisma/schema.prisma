@@ -17,4 +17,58 @@ model User {
   email     String?
   avatarUrl String?
   createdAt DateTime @default(now())
+
+  userBadges UserBadges[]
+
+  votesForHeroOfSprints VotesForHeroOfSprint[] @relation("VotesForHeroOfSprint_voter")
+
+  sentRecognitionMessages RecognitionMessage[] @relation("Recognition_sender")
+
+  receivedRecognitionMessages RecognitionMessage[] @relation("Recognition_recipient")
+
+  nominatedVotesForHeroOfSprints VotesForHeroOfSprint[] @relation("VotesForHeroOfSprint_nominee")
+}
+
+model Badges {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  description  String   
+  icon_url  String
+
+  userBadges UserBadges[]
+}
+
+model UserBadges {
+  id        String   @id @default(cuid())
+  userId    String
+  badgeId   String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  badge     Badges   @relation(fields: [badgeId], references: [id])
+
+  @@unique([userId, badgeId])
+}
+
+model VotesForHeroOfSprint {
+  id        String   @id @default(cuid())
+  voterId   String
+  nomineeId String
+  sprintId  String
+  createdAt DateTime @default(now())
+
+  voter     User     @relation("VotesForHeroOfSprint_voter", fields: [voterId], references: [id])
+  nominee   User     @relation("VotesForHeroOfSprint_nominee", fields: [nomineeId], references: [id])
+}
+
+model RecognitionMessage {
+  id          String   @id @default(cuid())
+  senderId    String
+  recipientId String
+  message     String
+  reason      String
+  createdAt   DateTime @default(now())
+
+  sender      User     @relation("Recognition_sender", fields: [senderId], references: [id])
+  recipient   User     @relation("Recognition_recipient", fields: [recipientId], references: [id])
 }
