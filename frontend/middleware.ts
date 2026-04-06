@@ -4,6 +4,11 @@ import { NextRequest, NextResponse } from "next/server";
 const PUBLIC_PATHS = ["/login", "/auth"];
 
 export async function middleware(req: NextRequest) {
+
+  if (req.nextUrl.pathname.startsWith("/api/webhook")) {
+    return;
+  }
+
   const { pathname } = req.nextUrl;
 
   // Let NextAuth API routes and static assets through unconditionally
