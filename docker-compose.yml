@@ -1,0 +1,21 @@
+# Apenas a aplicação. O PostgreSQL 16 fica no host (fora do Compose).
+# Acesso ao banco: use DB_HOST=host.docker.internal (Linux: requer extra_hosts abaixo)
+# ou o IP do host na rede Docker (ex.: 172.17.0.1).
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://github.cedis.tec.br}
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      # Nginx (no host ou em outro stack) faz proxy reverso para esta porta.
+      - "127.0.0.1:3000:3000"
+    extra_hosts:
+      # Permite que o container alcance serviços no host (ex.: PostgreSQL) via host.docker.internal
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
