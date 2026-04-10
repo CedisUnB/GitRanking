@@ -4,13 +4,18 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import { SignOutButton } from "@/components/Buttons/SignOutButton";
 
-export default async function Profile() {
+export default async function Profile({
+  searchParams,
+}: {
+  searchParams: { repo?: string };
+}) {
   const session = await getServerSession(authOptions);
 
   if (!session) {
     redirect("/login");
   }
 
+  const selectedRepo = searchParams.repo;
   const { user } = session;
 
   return (
@@ -43,6 +48,12 @@ export default async function Profile() {
       </nav>
 
       <div className="mx-auto max-w-6xl px-6 py-10">
+        {selectedRepo && (
+          <p className="mb-4 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+            Selected repository:{" "}
+            <span className="font-mono font-medium">{selectedRepo}</span>
+          </p>
+        )}
         <div className="mb-8 rounded-2xl bg-white/90 px-8 py-8 shadow-sm ring-1 ring-black/5">
           <div className="flex items-center gap-5">
             {user.image && (
