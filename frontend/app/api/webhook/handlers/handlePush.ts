@@ -1,4 +1,4 @@
-async function handlePush(body: any) {
+export async function handlePush(body: any) {
   console.log("🚀 Push received!");
 
   const commits = body.commits;

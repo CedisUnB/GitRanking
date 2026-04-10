@@ -1,4 +1,4 @@
-async function handleIssue(body: any) {
+export async function handleIssue(body: any) {
   if (body.action === "opened") {
     console.log("New issue!");
     console.log("Title:", body.issue.title);

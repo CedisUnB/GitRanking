@@ -1,3 +1,6 @@
+import { handleIssue } from './handlers/handleIssue';
+import { handlePush } from './handlers/handlePush';
+
 export async function POST(req: Request) {
   console.log("Received webhook:");
   const event = req.headers.get("x-github-event");
