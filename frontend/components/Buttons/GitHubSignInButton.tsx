@@ -6,7 +6,7 @@ export function GitHubSignInButton() {
   return (
     <button
       type="button"
-      onClick={() => signIn("github", { callbackUrl: "/profile" })}
+      onClick={() => signIn("github", { callbackUrl: "/repositories" })}
       className="mt-8 inline-flex w-full items-center justify-center gap-3 rounded-lg bg-[#4B1E78] px-5 py-4 text-base font-semibold text-white shadow-sm transition hover:bg-[#3F1864] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B1E78] focus-visible:ring-offset-2"
     >
       <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-current">
