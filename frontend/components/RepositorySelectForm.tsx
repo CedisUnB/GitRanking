@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 type GitHubRepo = {
   id: number;
   full_name: string;
+  private: boolean;
+  description: string | null;
 };
 
 export function RepositorySelectBlock() {
@@ -17,12 +19,15 @@ export function RepositorySelectBlock() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notInstalled, setNotInstalled] = useState(false);
+  const [installUrl, setInstallUrl] = useState<string | null>(null);
 
   const loadRepos = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setNotInstalled(false);
     try {
-      const res = await fetch("/api/github/repos", { credentials: "include" });
+      const res = await fetch("/api/github/installation-repos", { credentials: "include" });
       if (res.status === 401) {
         router.replace("/login");
         return;
@@ -33,14 +38,19 @@ export function RepositorySelectBlock() {
         setRepos([]);
         return;
       }
-      const data: GitHubRepo[] = await res.json();
-      setRepos(Array.isArray(data) ? data : []);
+      const body = await res.json();
+      if (body.notInstalled) {
+        setNotInstalled(true);
+        setInstallUrl(body.installUrl ?? null);
+        setRepos([]);
+        return;
+      }
+      setRepos(Array.isArray(body) ? body : []);
     } catch {
       setError("Could not load repositories.");
       setRepos([]);
     } finally {
       setLoading(false);
-
     }
   },
     [router]
@@ -69,20 +79,26 @@ export function RepositorySelectBlock() {
   }, [open]);
 
   const hasChoices = repos.length > 0;
-  const disabled = loading || !!error || !hasChoices;
+  const disabled = loading || !!error || !hasChoices || notInstalled;
 
   const placeholder =
-    loading ? "Loading repositories…" : error ? "Could not load list" : hasChoices ? "Select a repository" : "No repositories found";
+    loading
+      ? "Loading repositories…"
+      : error
+      ? "Could not load list"
+      : notInstalled
+      ? "No authorized repositories"
+      : hasChoices
+      ? "Select a repository"
+      : "No repositories found";
 
   const displayLabel = selected || placeholder;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!selected)
-      return;
-
-    router.push(`/profile?repo=${encodeURIComponent(selected)
-      }`);
+    if (!selected) return;
+    const [owner, repo] = selected.split("/");
+    router.push(`/repository/${owner}/${repo}/profile`);
   }
 
   return (
@@ -163,15 +179,44 @@ export function RepositorySelectBlock() {
             </p>
           )
         } </form>
-      <p className="mt-12 text-center text-sm text-slate-600">
-        We just have access to the repositories that you give us permission to.
-        <br />
-        If you never give us permission,{" "}
-        <Link href="https://github.com/settings/applications" className="text-violet-600 underline" target="_blank" rel="noopener noreferrer">
-          click here
-        </Link>
-        .
-      </p>
+
+      {notInstalled ? (
+        <div className="mt-12 text-center">
+          <p className="text-sm text-slate-600">
+            You have not installed the GitHub App yet, or you have not selected any repositories.
+          </p>
+          <a
+            href={installUrl ?? "https://github.com/apps/tcc-gitrank-localteste/installations/new"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-block rounded-lg bg-violet-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-violet-700"
+          >
+            Install GitHub App &amp; select repositories
+          </a>
+          <p className="mt-3 text-xs text-slate-400">
+            After installing, come back and{" "}
+            <button type="button" onClick={() => void loadRepos()} className="text-violet-600 underline">
+              refresh the list
+            </button>
+            .
+          </p>
+        </div>
+      ) : (
+        <p className="mt-12 text-center text-sm text-slate-600">
+          Only repositories you authorized during the GitHub App installation are shown.
+          <br />
+          To change which repositories are accessible,{" "}
+          <Link
+            href="https://github.com/apps/tcc-gitrank-localteste/installations/new"
+            className="text-violet-600 underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            manage your installation
+          </Link>
+          .
+        </p>
+      )}
     </>
   );
 }
