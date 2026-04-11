@@ -29,46 +29,67 @@ model User {
   nominatedVotesForHeroOfSprints VotesForHeroOfSprint[] @relation("VotesForHeroOfSprint_nominee")
 }
 
+/// A GitHub repository that has been accessed via the app at least once.
+model Repository {
+  id              String   @id @default(cuid())
+  githubRepoId    String   @unique  // numeric GitHub repo ID — stable across renames
+  owner           String            
+  name            String            
+  fullName        String            
+  private         Boolean
+  firstAccessedAt DateTime @default(now())
+
+  userBadges            UserBadges[]
+  recognitionMessages   RecognitionMessage[]
+  votesForHeroOfSprints VotesForHeroOfSprint[]
+}
+
 model Badges {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  description  String   
-  icon_url  String
+  id          String @id @default(cuid())
+  name        String @unique
+  description String
+  icon_url    String
 
   userBadges UserBadges[]
 }
 
 model UserBadges {
-  id        String   @id @default(cuid())
-  userId    String
-  badgeId   String
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  userId       String
+  badgeId      String
+  repositoryId String?
+  createdAt    DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id])
-  badge     Badges   @relation(fields: [badgeId], references: [id])
+  user       User        @relation(fields: [userId], references: [id])
+  badge      Badges      @relation(fields: [badgeId], references: [id])
+  repository Repository? @relation(fields: [repositoryId], references: [id])
 
   @@unique([userId, badgeId])
 }
 
 model VotesForHeroOfSprint {
-  id        String   @id @default(cuid())
-  voterId   String
-  nomineeId String
-  sprintId  String
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  voterId      String
+  nomineeId    String
+  sprintId     String
+  repositoryId String?
+  createdAt    DateTime @default(now())
 
-  voter     User     @relation("VotesForHeroOfSprint_voter", fields: [voterId], references: [id])
-  nominee   User     @relation("VotesForHeroOfSprint_nominee", fields: [nomineeId], references: [id])
+  voter      User        @relation("VotesForHeroOfSprint_voter", fields: [voterId], references: [id])
+  nominee    User        @relation("VotesForHeroOfSprint_nominee", fields: [nomineeId], references: [id])
+  repository Repository? @relation(fields: [repositoryId], references: [id])
 }
 
 model RecognitionMessage {
-  id          String   @id @default(cuid())
-  senderId    String
-  recipientId String
-  message     String
-  reason      String
-  createdAt   DateTime @default(now())
+  id           String   @id @default(cuid())
+  senderId     String
+  recipientId  String
+  message      String
+  reason       String
+  repositoryId String?
+  createdAt    DateTime @default(now())
 
-  sender      User     @relation("Recognition_sender", fields: [senderId], references: [id])
-  recipient   User     @relation("Recognition_recipient", fields: [recipientId], references: [id])
+  sender     User        @relation("Recognition_sender", fields: [senderId], references: [id])
+  recipient  User        @relation("Recognition_recipient", fields: [recipientId], references: [id])
+  repository Repository? @relation(fields: [repositoryId], references: [id])
 }
