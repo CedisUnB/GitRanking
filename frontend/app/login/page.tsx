@@ -1,6 +1,6 @@
+import { GitHubSignInButton } from "@/components/ui/Buttons/GitHubSignInButton";
 import Image from "next/image";
 import Link from "next/link";
-import { GitHubSignInButton } from "@/components/Buttons/GitHubSignInButton";
 
 export default function Login() {
   return (

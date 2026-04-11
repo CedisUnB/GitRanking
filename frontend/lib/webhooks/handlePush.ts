@@ -1,5 +1,5 @@
 export async function handlePush(body: any) {
-  console.log("🚀 Push received!");
+  console.log("Push received!");
 
   const commits = body.commits;
 

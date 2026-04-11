@@ -1,5 +1,5 @@
 import Image from "next/image";
-import {RepositorySelectBlock} from "@/components/RepositorySelectForm";
+import { RepositorySelectBlock } from "@/components/repository/RepositorySelectForm";
 
 export default function RepositoriesPage() {
     return (
