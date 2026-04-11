@@ -2,7 +2,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Image from "next/image";
-import { SignOutButton } from "@/components/Buttons/SignOutButton";
+import { SignOutButton } from "@/components/ui/Buttons/SignOutButton";
+import { upsertRepository } from "@/lib/repository";
 
 export default async function RepositoryProfile({
   params,
@@ -15,8 +16,11 @@ export default async function RepositoryProfile({
     redirect("/login");
   }
 
-  const selectedRepo = `${params.owner}/${params.repo}`;
+  const { owner, repo } = params;
+  const selectedRepo = `${owner}/${repo}`;
   const { user } = session;
+
+  await upsertRepository(owner, repo, session.accessToken);
 
   return (
     <main className="min-h-screen bg-[#E9ECF1] font-[family-name:var(--font-geist-sans)]">
