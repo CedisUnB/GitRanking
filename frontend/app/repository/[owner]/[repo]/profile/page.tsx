@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import { upsertRepository } from "@/lib/repository";
+import { getAuthenticatedUserProfile } from "@/lib/github-client";
 
 type GitHubUserProfile = {
   name: string | null;
@@ -32,17 +33,9 @@ export default async function RepositoryProfile({
   let githubProfile: GitHubUserProfile | null = null;
 
   try {
-    const profileResponse = await fetch("https://api.github.com/user", {
-      headers: {
-        Authorization: `Bearer ${session.accessToken}`,
-        Accept: "application/vnd.github+json",
-      },
-      cache: "no-store",
-    });
-
-    if (profileResponse.ok) {
-      githubProfile = (await profileResponse.json()) as GitHubUserProfile;
-    }
+    githubProfile = (await getAuthenticatedUserProfile(
+      session.accessToken
+    )) as GitHubUserProfile;
   } catch (error) {
     console.error("[profile] Failed to load GitHub profile:", error);
   }

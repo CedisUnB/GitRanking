@@ -4,11 +4,7 @@ import type { ReactNode } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { RepositoryHeader } from "@/components/layout/RepositoryHeader";
 import { authOptions } from "@/lib/auth";
-
-type GitHubIssue = {
-  title: string;
-  pull_request?: unknown;
-};
+import { getCurrentMilestoneIssues } from "@/lib/github-client";
 
 export default async function RepositoryLayout({
   children,
@@ -25,26 +21,18 @@ export default async function RepositoryLayout({
   const repoNameOnly = params.repo;
 
   let currentSprintTitle: string | null = null;
+  let currentIssueTitle: string | null = null;
   try {
-    const res = await fetch(
-      `https://api.github.com/repos/${params.owner}/${params.repo}/issues?state=open&per_page=10`,
-      {
-        headers: {
-          Authorization: `Bearer ${session.accessToken}`,
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
-        },
-        cache: "no-store",
-      }
+    const sprintData = await getCurrentMilestoneIssues(
+      params.owner,
+      params.repo,
+      session.accessToken,
+      { state: "open" }
     );
-
-    if (res.ok) {
-      const issues = (await res.json()) as GitHubIssue[];
-      const firstIssue = issues.find((i) => !("pull_request" in i));
-      currentSprintTitle = firstIssue?.title ?? null;
-    }
+    currentSprintTitle = sprintData.currentMilestone?.title ?? null;
+    currentIssueTitle = sprintData.issues[0]?.title ?? null;
   } catch (error) {
-    console.error("[repo layout] Failed to load issues:", error);
+    console.error("[repo layout] Failed to load current milestone:", error);
   }
 
   return (
@@ -55,7 +43,11 @@ export default async function RepositoryLayout({
         profileHref={`/repository/${params.owner}/${params.repo}/profile`}
       />
       <div className="flex-1 bg-[#EFF0F2]">
-        <RepositoryHeader repoName={repoNameOnly} sprintTitle={currentSprintTitle} />
+        <RepositoryHeader
+          repoName={repoNameOnly}
+          sprintTitle={currentSprintTitle}
+          issueTitle={currentIssueTitle}
+        />
         <div className="px-6 py-8">{children}</div>
       </div>
     </div>
