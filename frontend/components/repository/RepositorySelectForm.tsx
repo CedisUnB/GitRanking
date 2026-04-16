@@ -98,7 +98,7 @@ export function RepositorySelectBlock() {
     e.preventDefault();
     if (!selected) return;
     const [owner, repo] = selected.split("/");
-    router.push(`/repository/${owner}/${repo}/profile`);
+    router.push(`/repository/${owner}/${repo}/overview`);
   }
 
   return (
