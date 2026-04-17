@@ -7,18 +7,33 @@ Next.js 14 app with GitHub App authentication and repository-scoped team feature
 ### `app/`
 Next.js App Router pages and API routes.
 
+#### Pages
+
 - `app/login/` — sign-in page
-- `app/repositories/` — repository selection page
-- `app/repository/[owner]/[repo]/profile/` — per-repository profile page
+- `app/repositories/` — repository selection page (with layout wrapper)
+- `app/repository/[owner]/[repo]/` — per-repository section with sidebar layout
+  - `profile/` — contributor profile page
+  - `overview/` — repository overview page
 - `app/auth/error/` — OAuth error page
+
+#### API Routes
+
 - `app/api/auth/` — NextAuth.js handler
-- `app/api/github/` — GitHub API proxy routes (installation repos, issues, commits)
+- `app/api/github/repositories/` — list repositories accessible to the authenticated user
+- `app/api/github/repositories/[owner]/[repo]/issues/assigned-open/` — open issues assigned to the current user
+- `app/api/github/repositories/[owner]/[repo]/members/` — repository member list
+- `app/api/github/repositories/[owner]/[repo]/milestone-current/issues/` — issues in the current milestone
+- `app/api/github/[owner]/[repo]/commits/` — repository commit history
+- `app/api/github/issues/` — general issues proxy
 - `app/api/webhook/` — GitHub webhook receiver
 
 ### `components/`
 React components grouped by concern.
 
-- `components/ui/Buttons/` — generic UI buttons (sign in, sign out)
+- `components/layout/Sidebar.tsx` — collapsible sidebar with repository navigation
+- `components/layout/RepositoryHeader.tsx` — top header for repository pages
+- `components/ui/Buttons/GitHubSignInButton.tsx` — GitHub OAuth sign-in button
+- `components/ui/Buttons/SignOutButton.tsx` — sign-out button
 - `components/repository/` — repository selection form
 - `components/providers.tsx` — session provider wrapper
 
@@ -28,8 +43,9 @@ Server-side logic and utilities.
 - `lib/auth.ts` — NextAuth config; upserts User on login
 - `lib/prisma.ts` — Prisma client singleton
 - `lib/github-app.ts` — GitHub App JWT, installation token, repo listing
+- `lib/github-client.ts` — GitHub REST API client wrapper (members, issues, milestones, commits)
 - `lib/repository.ts` — upserts Repository row on page visit
-- `lib/webhooks/` — webhook event handlers (push, issues)
+- `lib/webhooks/` — webhook event handlers (push, issues, pull requests)
 
 ### `prisma/`
 Database schema and migrations (PostgreSQL via Supabase).
@@ -38,9 +54,10 @@ Database schema and migrations (PostgreSQL via Supabase).
 - `prisma/migrations/` — migration history
 
 ### `types/`
-TypeScript module augmentations.
+TypeScript type definitions.
 
 - `types/next-auth.d.ts` — extends Session and JWT with GitHub fields
+- `types/github.ts` — GitHub API response types
 
 ## Environment Variables
 
