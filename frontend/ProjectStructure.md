@@ -12,8 +12,9 @@ Next.js App Router pages and API routes.
 - `app/login/` — sign-in page
 - `app/repositories/` — repository selection page (with layout wrapper)
 - `app/repository/[owner]/[repo]/` — per-repository section with sidebar layout
-  - `profile/` — contributor profile page
   - `overview/` — repository overview page
+  - `profile/` — contributor profile page
+  - `metrics/` — sprint metrics page; currently contains the Oracle card (velocity-based sprint prediction)
 - `app/auth/error/` — OAuth error page
 
 #### API Routes
@@ -30,11 +31,12 @@ Next.js App Router pages and API routes.
 ### `components/`
 React components grouped by concern.
 
-- `components/layout/Sidebar.tsx` — collapsible sidebar with repository navigation
+- `components/layout/Sidebar.tsx` — collapsible sidebar with repository navigation; accepts `overviewHref`, `profileHref`, and `metricsHref` props
 - `components/layout/RepositoryHeader.tsx` — top header for repository pages
 - `components/ui/Buttons/GitHubSignInButton.tsx` — GitHub OAuth sign-in button
 - `components/ui/Buttons/SignOutButton.tsx` — sign-out button
 - `components/repository/` — repository selection form
+- `components/metrics/OracleCard.tsx` — Oracle metric card; displays sprint velocity prediction with early/on-track/at-risk states
 - `components/providers.tsx` — session provider wrapper
 
 ### `lib/`
@@ -43,7 +45,7 @@ Server-side logic and utilities.
 - `lib/auth.ts` — NextAuth config; upserts User on login
 - `lib/prisma.ts` — Prisma client singleton
 - `lib/github-app.ts` — GitHub App JWT, installation token, repo listing
-- `lib/github-client.ts` — GitHub REST API client wrapper (members, issues, milestones, commits)
+- `lib/github-client.ts` — GitHub REST API client wrapper (members, issues, milestones, commits); includes `getMilestoneVelocityData` for sprint velocity computation
 - `lib/repository.ts` — upserts Repository row on page visit
 - `lib/webhooks/` — webhook event handlers (push, issues, pull requests)
 
@@ -57,7 +59,7 @@ Database schema and migrations (PostgreSQL via Supabase).
 TypeScript type definitions.
 
 - `types/next-auth.d.ts` — extends Session and JWT with GitHub fields
-- `types/github.ts` — GitHub API response types
+- `types/github.ts` — GitHub API response types; `MilestoneDto` includes `createdAt` for velocity calculations
 
 ## Environment Variables
 
