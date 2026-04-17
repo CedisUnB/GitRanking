@@ -9,11 +9,34 @@ import { createPrivateKey } from "crypto";
  * Node's createPrivateKey handles PKCS#1 natively, and jose accepts
  * a Node KeyObject directly — no PKCS#8 conversion needed.
  */
+function toPemFromBody(base64Body: string): string {
+  const normalized = base64Body.replace(/\s+/g, "");
+  const chunks = normalized.match(/.{1,64}/g) ?? [];
+  return [
+    "-----BEGIN RSA PRIVATE KEY-----",
+    ...chunks,
+    "-----END RSA PRIVATE KEY-----",
+  ].join("\n");
+}
+
+
+/**
+ * Converts `GITHUB_APP_PRIVATE_KEY` to a `KeyObject`.
+ * Accepts: PEM, base64 of PEM, or base64 body only.
+ */
 function getPrivateKey() {
-  const b64 = process.env.GITHUB_APP_PRIVATE_KEY;
-  if (!b64) throw new Error("GITHUB_APP_PRIVATE_KEY env var is not set");
-  const pem = Buffer.from(b64, "base64").toString("utf-8");
-  return createPrivateKey(pem);
+  const raw = process.env.GITHUB_APP_PRIVATE_KEY?.trim();
+  if (!raw) throw new Error("GITHUB_APP_PRIVATE_KEY env var is not set");
+
+  const maybePem = raw.replace(/\\n/g, "\n");
+  if (maybePem.includes("BEGIN") && maybePem.includes("PRIVATE KEY")) {
+    return createPrivateKey(maybePem);
+  }
+  const decoded = Buffer.from(raw, "base64").toString("utf-8");
+  if (decoded.includes("BEGIN") && decoded.includes("PRIVATE KEY")) {
+    return createPrivateKey(decoded);
+  }
+  return createPrivateKey(toPemFromBody(raw));
 }
 
 /**

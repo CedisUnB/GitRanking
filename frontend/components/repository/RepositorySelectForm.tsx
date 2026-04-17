@@ -3,17 +3,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { RepositoryDto } from "@/types/github";
 
-type GitHubRepo = {
-  id: number;
-  full_name: string;
-  private: boolean;
-  description: string | null;
-};
+type RepositoriesApiResponse =
+  | {
+      repositories: RepositoryDto[];
+    }
+  | {
+      notInstalled: true;
+      installUrl: string | null;
+    };
 
 export function RepositorySelectBlock() {
   const router = useRouter();
-  const [repos, setRepos] = useState<GitHubRepo[]>([]);
+  const [repos, setRepos] = useState<RepositoryDto[]>([]);
   const [selected, setSelected] = useState("");
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -27,34 +30,42 @@ export function RepositorySelectBlock() {
     setError(null);
     setNotInstalled(false);
     try {
-      const res = await fetch("/api/github/installation-repos", { credentials: "include" });
+      const res = await fetch("/api/github/repositories", {
+        credentials: "include",
+      });
       if (res.status === 401) {
         router.replace("/login");
         return;
       }
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setError(typeof body.error === "string" ? body.error : "Could not load repositories.");
+        setError(
+          typeof body.error === "string"
+            ? body.error
+            : "Could not load repositories.",
+        );
         setRepos([]);
         return;
       }
-      const body = await res.json();
-      if (body.notInstalled) {
+      const body = (await res.json()) as RepositoriesApiResponse;
+      if ("notInstalled" in body && body.notInstalled) {
         setNotInstalled(true);
         setInstallUrl(body.installUrl ?? null);
         setRepos([]);
         return;
       }
-      setRepos(Array.isArray(body) ? body : []);
+      setRepos(
+        "repositories" in body && Array.isArray(body.repositories)
+          ? body.repositories
+          : [],
+      );
     } catch {
       setError("Could not load repositories.");
       setRepos([]);
     } finally {
       setLoading(false);
     }
-  },
-    [router]
-  );
+  }, [router]);
 
   useEffect(() => {
     void loadRepos();
@@ -63,7 +74,10 @@ export function RepositorySelectBlock() {
   useEffect(() => {
     if (!open) return;
     function handlePointerDown(e: PointerEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
         setOpen(false);
       }
     }
@@ -81,16 +95,15 @@ export function RepositorySelectBlock() {
   const hasChoices = repos.length > 0;
   const disabled = loading || !!error || !hasChoices || notInstalled;
 
-  const placeholder =
-    loading
-      ? "Loading repositories…"
-      : error
+  const placeholder = loading
+    ? "Loading repositories…"
+    : error
       ? "Could not load list"
       : notInstalled
-      ? "No authorized repositories"
-      : hasChoices
-      ? "Select a repository"
-      : "No repositories found";
+        ? "No authorized repositories"
+        : hasChoices
+          ? "Select a repository"
+          : "No repositories found";
 
   const displayLabel = selected || placeholder;
 
@@ -98,13 +111,12 @@ export function RepositorySelectBlock() {
     e.preventDefault();
     if (!selected) return;
     const [owner, repo] = selected.split("/");
-    router.push(`/repository/${owner}/${repo}/profile`);
+    router.push(`/repository/${owner}/${repo}/overview`);
   }
 
   return (
     <>
-      <form className="mt-10 w-full max-w-md"
-        onSubmit={handleSubmit}>
+      <form className="mt-10 w-full max-w-md" onSubmit={handleSubmit}>
         <div className="flex w-full flex-col gap-3 sm:flex-row">
           <div ref={containerRef} className="relative flex-1">
             <button
@@ -135,7 +147,7 @@ export function RepositorySelectBlock() {
                 className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
               >
                 {repos.map((repo) => {
-                  const isSelected = selected === repo.full_name;
+                  const isSelected = selected === repo.fullName;
                   return (
                     <li key={repo.id} role="presentation">
                       <button
@@ -144,11 +156,11 @@ export function RepositorySelectBlock() {
                         aria-selected={isSelected}
                         className={`w-full truncate px-4 py-2.5 text-left text-sm text-slate-800 hover:bg-violet-50 ${isSelected ? "bg-violet-50 font-medium" : ""}`}
                         onClick={() => {
-                          setSelected(repo.full_name);
+                          setSelected(repo.fullName);
                           setOpen(false);
                         }}
                       >
-                        {repo.full_name}
+                        {repo.fullName}
                       </button>
                     </li>
                   );
@@ -156,37 +168,39 @@ export function RepositorySelectBlock() {
               </ul>
             )}
           </div>
-          <button type="submit"
-            disabled={
-              !selected || disabled
-            }
-            className="h-12 rounded-lg bg-violet-600 px-10 font-medium text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50">
+          <button
+            type="submit"
+            disabled={!selected || disabled}
+            className="h-12 rounded-lg bg-violet-600 px-10 font-medium text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Send
           </button>
         </div>
-        {
-          error && (
-            <p className="mt-3 text-left text-sm text-red-600">
-              {error}
-              {" "}
-              <button type="button"
-                onClick={
-                  () => void loadRepos()
-                }
-                className="font-medium text-violet-600 underline">
-                Try again
-              </button>
-            </p>
-          )
-        } </form>
+        {error && (
+          <p className="mt-3 text-left text-sm text-red-600">
+            {error}{" "}
+            <button
+              type="button"
+              onClick={() => void loadRepos()}
+              className="font-medium text-violet-600 underline"
+            >
+              Try again
+            </button>
+          </p>
+        )}{" "}
+      </form>
 
       {notInstalled ? (
         <div className="mt-12 text-center">
           <p className="text-sm text-slate-600">
-            You have not installed the GitHub App yet, or you have not selected any repositories.
+            You have not installed the GitHub App yet, or you have not selected
+            any repositories.
           </p>
           <a
-            href={installUrl ?? "https://github.com/apps/tcc-gitrank-localteste/installations/new"}
+            href={
+              installUrl ??
+              "https://github.com/apps/tcc-gitrank-localteste/installations/new"
+            }
             target="_blank"
             rel="noopener noreferrer"
             className="mt-4 inline-block rounded-lg bg-violet-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-violet-700"
@@ -195,7 +209,11 @@ export function RepositorySelectBlock() {
           </a>
           <p className="mt-3 text-xs text-slate-400">
             After installing, come back and{" "}
-            <button type="button" onClick={() => void loadRepos()} className="text-violet-600 underline">
+            <button
+              type="button"
+              onClick={() => void loadRepos()}
+              className="text-violet-600 underline"
+            >
               refresh the list
             </button>
             .
@@ -203,7 +221,8 @@ export function RepositorySelectBlock() {
         </div>
       ) : (
         <p className="mt-12 text-center text-sm text-slate-600">
-          Only repositories you authorized during the GitHub App installation are shown.
+          Only repositories you authorized during the GitHub App installation
+          are shown.
           <br />
           To change which repositories are accessible,{" "}
           <Link
