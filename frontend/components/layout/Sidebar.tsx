@@ -9,14 +9,17 @@ export function Sidebar({
   repositoryLabel,
   overviewHref,
   profileHref,
+  metricsHref,
 }: {
   repositoryLabel: string;
   overviewHref?: string;
   profileHref?: string;
+  metricsHref?: string;
 }) {
   const pathname = usePathname();
   const isOverviewActive = Boolean(overviewHref && pathname === overviewHref);
   const isProfileActive = Boolean(profileHref && pathname === profileHref);
+  const isMetricsActive = Boolean(metricsHref && pathname === metricsHref);
   const activeClass = "text-[#3C0366] underline underline-offset-4";
   const inactiveClass = "text-slate-500 hover:text-slate-700";
   const repoNameOnly = repositoryLabel.split("/").pop() ?? repositoryLabel;
@@ -54,12 +57,25 @@ export function Sidebar({
             </div>
           )}
 
-          <div
-            className="mt-8 cursor-not-allowed text-base font-medium leading-6 text-slate-500"
-            aria-disabled
-          >
-            Metrics
-          </div>
+          <div className="my-8 h-px w-full bg-slate-200" />
+
+          {metricsHref ? (
+            <Link
+              href={metricsHref}
+              className={`text-base font-medium leading-6 transition ${
+                isMetricsActive ? activeClass : inactiveClass
+              }`}
+            >
+              Metrics
+            </Link>
+          ) : (
+            <div
+              className="cursor-not-allowed text-base font-medium leading-6 text-slate-400"
+              aria-disabled
+            >
+              Metrics
+            </div>
+          )}
 
           <div className="my-8 h-px w-full bg-slate-200" />
 
