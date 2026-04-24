@@ -28,6 +28,7 @@ type GithubIssue = {
     title: string;
     due_on: string | null;
     description: string | null;
+    created_at: string;
   } | null;
   pull_request?: unknown;
 };
@@ -37,6 +38,7 @@ type GithubMilestone = {
   title: string;
   due_on: string | null;
   description: string | null;
+  created_at: string;
 };
 
 type GithubCollaborator = {
@@ -131,6 +133,7 @@ function toMilestoneDto(value: GithubMilestone): MilestoneDto {
     title: value.title,
     dueOn: value.due_on,
     description: value.description,
+    createdAt: value.created_at,
   };
 }
 
@@ -281,4 +284,54 @@ export async function getAuthenticatedUserProfile(
     "https://api.github.com/user",
     userAccessToken
   );
+}
+
+export type MilestoneVelocityData = {
+  currentMilestone: MilestoneDto | null;
+  openCount: number;
+  closedCount: number;
+};
+
+export async function getMilestoneVelocityData(
+  owner: string,
+  repo: string,
+  userAccessToken: string,
+): Promise<MilestoneVelocityData> {
+  const installationId = await getInstallationIdForUser(userAccessToken);
+  const installationToken = await getInstallationToken(installationId);
+
+  const milestones = await githubPaginatedFetchJson<GithubMilestone>(
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/milestones?state=open&sort=due_on&direction=asc`,
+    installationToken,
+  );
+
+  const now = Date.now();
+  const currentMilestone = milestones.find((m) => {
+    if (!m.due_on) return false;
+    return new Date(m.due_on).getTime() >= now;
+  });
+
+  if (!currentMilestone) {
+    return { currentMilestone: null, openCount: 0, closedCount: 0 };
+  }
+
+  const [openIssues, closedIssues] = await Promise.all([
+    githubPaginatedFetchJson<GithubIssue>(
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues?milestone=${currentMilestone.number}&state=open`,
+      installationToken,
+    ),
+    githubPaginatedFetchJson<GithubIssue>(
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues?milestone=${currentMilestone.number}&state=closed`,
+      installationToken,
+    ),
+  ]);
+
+  const openCount = openIssues.filter((i) => !i.pull_request).length;
+  const closedCount = closedIssues.filter((i) => !i.pull_request).length;
+
+  return {
+    currentMilestone: toMilestoneDto(currentMilestone),
+    openCount,
+    closedCount,
+  };
 }

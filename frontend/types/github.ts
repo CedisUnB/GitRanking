@@ -30,6 +30,7 @@ export type MilestoneDto = {
   title: string;
   dueOn: string | null;
   description: string | null;
+  createdAt: string;
 };
 
 export type IssueDto = {
