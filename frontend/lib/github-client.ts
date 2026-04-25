@@ -2,6 +2,8 @@ import {
   getInstallationRepos,
   getUserInstallationId,
   getInstallationToken,
+  getInstallationIdsForUser,
+  getInstallationIdForOwner,
 } from "@/lib/github-app";
 import type {
   IssueDto,
@@ -153,10 +155,28 @@ function toIssueDto(value: GithubIssue): IssueDto {
   };
 }
 
+/**
+ * Returns the installation token for a specific repo owner (org or personal).
+ * Uses the App JWT to look up the installation directly — no user token needed.
+ * Throws NOT_INSTALLED if the app is not installed for that owner.
+ */
 export async function getInstallationIdForUser(
-  userAccessToken: string,
+  _userAccessToken: string,
+  owner?: string,
 ): Promise<number> {
-  const installationId = await getUserInstallationId(userAccessToken);
+  // If we know the owner, use the direct App JWT lookup (works for orgs + users)
+  if (owner) {
+    const installationId = await getInstallationIdForOwner(owner);
+    if (installationId !== null) return installationId;
+    throw new GithubApiError(
+      "GitHub App not installed for this owner",
+      404,
+      "NOT_INSTALLED",
+    );
+  }
+
+  // Fallback: legacy user-installations lookup (personal accounts only)
+  const installationId = await getUserInstallationId(_userAccessToken);
   if (installationId === null) {
     throw new GithubApiError(
       "GitHub App not installed for user",
@@ -164,28 +184,42 @@ export async function getInstallationIdForUser(
       "NOT_INSTALLED",
     );
   }
-
   return installationId;
 }
 
+/**
+ * Returns all repos the logged-in user can access via this GitHub App —
+ * including repos from orgs the user is a member of, and their personal account.
+ */
 export async function getAccessibleRepositories(
   userAccessToken: string,
 ): Promise<RepositoryDto[] | null> {
-  const installationId = await getUserInstallationId(userAccessToken);
-  if (installationId === null) return null;
+  const installationIds = await getInstallationIdsForUser(userAccessToken);
+  if (installationIds.length === 0) return null;
 
-  const repos = await getInstallationRepos(installationId);
-  return repos.map((repo) => {
-    const [owner, name] = repo.full_name.split("/");
-    return {
-      id: repo.id,
-      owner: owner ?? "",
-      name: name ?? "",
-      fullName: repo.full_name,
-      private: repo.private,
-      description: repo.description,
-    };
-  });
+  const allRepos = await Promise.all(
+    installationIds.map((id) => getInstallationRepos(id)),
+  );
+
+  const seen = new Set<number>();
+  return allRepos
+    .flat()
+    .filter((repo) => {
+      if (seen.has(repo.id)) return false;
+      seen.add(repo.id);
+      return true;
+    })
+    .map((repo) => {
+      const [owner, name] = repo.full_name.split("/");
+      return {
+        id: repo.id,
+        owner: owner ?? "",
+        name: name ?? "",
+        fullName: repo.full_name,
+        private: repo.private,
+        description: repo.description,
+      };
+    });
 }
 
 export async function getRepositoryMembers(
@@ -193,7 +227,7 @@ export async function getRepositoryMembers(
   repo: string,
   userAccessToken: string,
 ): Promise<RepositoryMemberDto[]> {
-  const installationId = await getInstallationIdForUser(userAccessToken);
+  const installationId = await getInstallationIdForUser(userAccessToken, owner);
   const installationToken = await getInstallationToken(installationId);
   const data = await githubPaginatedFetchJson<GithubCollaborator>(
     `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/collaborators`,
@@ -220,7 +254,7 @@ export async function getCurrentMilestoneIssues(
   userAccessToken: string,
   options?: { assignee?: string; state?: "open" | "all" },
 ): Promise<{ currentMilestone: MilestoneDto | null; issues: IssueDto[] }> {
-  const installationId = await getInstallationIdForUser(userAccessToken);
+  const installationId = await getInstallationIdForUser(userAccessToken, owner);
   const installationToken = await getInstallationToken(installationId);
 
   const milestones = await githubPaginatedFetchJson<GithubMilestone>(
@@ -261,7 +295,7 @@ export async function getAssignedOpenIssues(
   userAccessToken: string,
   username: string,
 ): Promise<IssueDto[]> {
-  const installationId = await getInstallationIdForUser(userAccessToken);
+  const installationId = await getInstallationIdForUser(userAccessToken, owner);
   const installationToken = await getInstallationToken(installationId);
   const query = new URLSearchParams({
     assignee: username,
@@ -297,7 +331,7 @@ export async function getMilestoneVelocityData(
   repo: string,
   userAccessToken: string,
 ): Promise<MilestoneVelocityData> {
-  const installationId = await getInstallationIdForUser(userAccessToken);
+  const installationId = await getInstallationIdForUser(userAccessToken, owner);
   const installationToken = await getInstallationToken(installationId);
 
   const milestones = await githubPaginatedFetchJson<GithubMilestone>(
@@ -334,4 +368,387 @@ export async function getMilestoneVelocityData(
     openCount,
     closedCount,
   };
+}
+
+// ---------------------------------------------------------------------------
+// GitHub Projects v2 — GraphQL helpers (org-level)
+// ---------------------------------------------------------------------------
+
+type GraphQLResponse<T> = { data: T; errors?: Array<{ message: string }> };
+
+type ProjectsV2Nodes = Array<{
+  items: {
+    nodes: Array<{
+      fieldValues: {
+        nodes: Array<
+          | {
+              __typename: "ProjectV2ItemFieldNumberValue";
+              number: number | null;
+              field: { name: string };
+            }
+          | {
+              __typename: "ProjectV2ItemFieldSingleSelectValue";
+              name: string;
+              field: { name: string };
+            }
+          | { __typename: string }
+        >;
+      };
+      content: {
+        __typename: string;
+        number?: number;
+        repository?: { nameWithOwner: string };
+      } | null;
+    }>;
+  };
+}>;
+
+type OrgProjectsV2Response = {
+  organization: { projectsV2: { nodes: ProjectsV2Nodes } };
+};
+
+async function githubGraphQL<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  token: string,
+): Promise<T> {
+  const response = await fetch("https://api.github.com/graphql", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query, variables }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new GithubApiError(
+      "GitHub GraphQL request failed",
+      response.status,
+      "GRAPHQL_ERROR",
+      text,
+    );
+  }
+
+  const json = (await response.json()) as GraphQLResponse<T>;
+  if (json.errors?.length) {
+    const message = json.errors.map((e) => e.message).join("; ");
+
+    if (message.includes("Resource not accessible")) {
+      throw new GithubApiError(
+        "Missing permissions for GitHub Projects v2",
+        403,
+        "INSUFFICIENT_PERMISSIONS",
+        message,
+      );
+    }
+
+    throw new GithubApiError(
+      "GitHub GraphQL errors",
+      422,
+      "GRAPHQL_ERROR",
+      message,
+    );
+  }
+  return json.data;
+}
+
+const ESTIMATE_FIELD_NAMES = [
+  "estimate",
+  "story points",
+  "story point",
+  "sp",
+  "points",
+];
+
+type ProjectData = {
+  /** issue number → estimate value (from Estimate / Story Points field) */
+  estimateMap: Map<number, number>;
+  /** issue number → Status option name (e.g. "In Progress") */
+  statusMap: Map<number, string>;
+};
+
+/**
+ * Queries GitHub Projects v2 for the given organization and returns estimate
+ * and status field values keyed by issue number, filtered to issues belonging
+ * to `owner/repo`.
+ *
+ * Uses the GitHub App installation token. Requires the GitHub App to have
+ * "Organization permissions → Projects: Read" granted.
+ */
+async function getProjectData(
+  owner: string,
+  repo: string,
+  installationToken: string,
+): Promise<ProjectData> {
+  const projectsFragment = `
+    projectsV2(first: 20) {
+      nodes {
+        items(first: 100) {
+          nodes {
+            fieldValues(first: 20) {
+              nodes {
+                __typename
+                ... on ProjectV2ItemFieldNumberValue {
+                  number
+                  field { ... on ProjectV2FieldCommon { name } }
+                }
+                ... on ProjectV2ItemFieldSingleSelectValue {
+                  name
+                  field { ... on ProjectV2FieldCommon { name } }
+                }
+              }
+            }
+            content {
+              __typename
+              ... on Issue {
+                number
+                repository { nameWithOwner }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const orgQuery = `query($login: String!) { organization(login: $login) { ${projectsFragment} } }`;
+  const repoFullName = `${owner}/${repo}`.toLowerCase();
+  let projectNodes: ProjectsV2Nodes = [];
+
+  try {
+    const data = await githubGraphQL<OrgProjectsV2Response>(
+      orgQuery,
+      { login: owner },
+      installationToken,
+    );
+    projectNodes = data.organization.projectsV2.nodes;
+    console.log(
+      `[projects] org="${owner}" projects=${projectNodes.length}`,
+    );
+  } catch (err) {
+    console.error(
+      "[projects] GraphQL failed — estimates and status will be empty:",
+      err,
+    );
+    return { estimateMap: new Map(), statusMap: new Map() };
+  }
+
+  const estimateMap = new Map<number, number>();
+  const statusMap = new Map<number, string>();
+
+  for (const project of projectNodes) {
+    for (const item of project.items.nodes) {
+      if (item.content?.__typename !== "Issue") continue;
+      if (!item.content.number) continue;
+      if (
+        item.content.repository?.nameWithOwner?.toLowerCase() !== repoFullName
+      )
+        continue;
+
+      const issueNumber = item.content.number;
+
+      for (const fv of item.fieldValues.nodes) {
+        if (
+          fv.__typename === "ProjectV2ItemFieldNumberValue" &&
+          !estimateMap.has(issueNumber)
+        ) {
+          const typedFv = fv as {
+            __typename: "ProjectV2ItemFieldNumberValue";
+            number: number | null;
+            field: { name: string };
+          };
+          if (
+            ESTIMATE_FIELD_NAMES.includes(typedFv.field.name.toLowerCase()) &&
+            typedFv.number != null
+          ) {
+            estimateMap.set(issueNumber, typedFv.number);
+          }
+        }
+
+        if (
+          fv.__typename === "ProjectV2ItemFieldSingleSelectValue" &&
+          !statusMap.has(issueNumber)
+        ) {
+          const typedFv = fv as {
+            __typename: "ProjectV2ItemFieldSingleSelectValue";
+            name: string;
+            field: { name: string };
+          };
+          if (typedFv.field.name.toLowerCase() === "status") {
+            statusMap.set(issueNumber, typedFv.name);
+          }
+        }
+      }
+    }
+  }
+
+  console.log(
+    `[projects] estimateMap=${estimateMap.size} statusMap=${statusMap.size}`,
+  );
+
+  return { estimateMap, statusMap };
+}
+
+// ---------------------------------------------------------------------------
+// Work In Progress
+// ---------------------------------------------------------------------------
+
+export type WipStatus = "todo" | "doing" | "review" | "done";
+
+export type WorkInProgressData = {
+  todo: number;
+  doing: number;
+  review: number;
+  done: number;
+};
+
+const STATUS_TODO = ["todo", "to do", "backlog", "ready"];
+const STATUS_DOING = ["doing", "in progress", "wip", "in development"];
+const STATUS_REVIEW = ["review", "in review", "in testing", "testing"];
+const STATUS_DONE = ["done", "completed", "closed"];
+
+function classifyByProjectStatus(statusName: string): WipStatus {
+  const s = statusName.toLowerCase();
+  if (STATUS_DONE.some((k) => s.includes(k))) return "done";
+  if (STATUS_REVIEW.some((k) => s.includes(k))) return "review";
+  if (STATUS_DOING.some((k) => s.includes(k))) return "doing";
+  if (STATUS_TODO.some((k) => s.includes(k))) return "todo";
+  // Unknown status option — treat as todo
+  return "todo";
+}
+
+export async function getWorkInProgressData(
+  owner: string,
+  repo: string,
+  userAccessToken: string,
+): Promise<WorkInProgressData> {
+  const installationId = await getInstallationIdForUser(userAccessToken, owner);
+  const installationToken = await getInstallationToken(installationId);
+
+  const milestones = await githubPaginatedFetchJson<GithubMilestone>(
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/milestones?state=open&sort=due_on&direction=asc`,
+    installationToken,
+  );
+
+  const now = Date.now();
+  const currentMilestone = milestones.find((m) => {
+    if (!m.due_on) return false;
+    return new Date(m.due_on).getTime() >= now;
+  });
+
+  if (!currentMilestone) {
+    return { todo: 0, doing: 0, review: 0, done: 0 };
+  }
+
+  const [issues, { statusMap }] = await Promise.all([
+    githubPaginatedFetchJson<GithubIssue>(
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues?milestone=${currentMilestone.number}&state=all`,
+      installationToken,
+    ),
+    getProjectData(owner, repo, installationToken),
+  ]);
+
+  const counts: WorkInProgressData = { todo: 0, doing: 0, review: 0, done: 0 };
+
+  for (const issue of issues) {
+    if (issue.pull_request) continue;
+
+    // Closed issues are always "done" regardless of project status
+    if (issue.state === "closed") {
+      counts.done += 1;
+      continue;
+    }
+
+    const projectStatus = statusMap.get(issue.number);
+    if (projectStatus) {
+      counts[classifyByProjectStatus(projectStatus)] += 1;
+    } else {
+      // Issue not in any project board — treat as todo
+      counts.todo += 1;
+    }
+  }
+
+  return counts;
+}
+
+// ---------------------------------------------------------------------------
+// Sprint history (last N milestones) — for Story Points & Sprint Tasks charts
+// ---------------------------------------------------------------------------
+
+export type SprintData = {
+  milestone: MilestoneDto;
+  totalIssues: number;
+  closedIssues: number;
+  totalPoints: number;
+  completedPoints: number;
+};
+
+export async function getSprintHistoryData(
+  owner: string,
+  repo: string,
+  userAccessToken: string,
+  count = 5,
+): Promise<SprintData[]> {
+  const installationId = await getInstallationIdForUser(userAccessToken, owner);
+  const installationToken = await getInstallationToken(installationId);
+
+  // Fetch recent closed milestones + open milestones and pick the last `count`
+  const [openMilestones, closedMilestones] = await Promise.all([
+    githubPaginatedFetchJson<GithubMilestone>(
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/milestones?state=open&sort=due_on&direction=asc`,
+      installationToken,
+    ),
+    githubPaginatedFetchJson<GithubMilestone>(
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/milestones?state=closed&sort=due_on&direction=desc`,
+      installationToken,
+    ),
+  ]);
+
+  // Combine: closed (most recent first) + open, then take last `count`
+  const combined = [...closedMilestones.slice(0, count), ...openMilestones]
+    .sort((a, b) => {
+      const aDate = a.due_on ? new Date(a.due_on).getTime() : 0;
+      const bDate = b.due_on ? new Date(b.due_on).getTime() : 0;
+      return aDate - bDate;
+    })
+    .slice(-count);
+
+  if (combined.length === 0) return [];
+
+  // Fetch estimates from GitHub Projects once
+  const { estimateMap } = await getProjectData(owner, repo, installationToken);
+
+  // For each milestone fetch all issues
+  const results = await Promise.all(
+    combined.map(async (milestone): Promise<SprintData> => {
+      const issues = await githubPaginatedFetchJson<GithubIssue>(
+        `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues?milestone=${milestone.number}&state=all`,
+        installationToken,
+      );
+
+      const filtered = issues.filter((i) => !i.pull_request);
+      const closed = filtered.filter((i) => i.state === "closed");
+
+      const totalPoints = filtered.reduce(
+        (sum, i) => sum + (estimateMap.get(i.number) ?? 0),
+        0,
+      );
+      const completedPoints = closed.reduce(
+        (sum, i) => sum + (estimateMap.get(i.number) ?? 0),
+        0,
+      );
+      return {
+        milestone: toMilestoneDto(milestone),
+        totalIssues: filtered.length,
+        closedIssues: closed.length,
+        totalPoints,
+        completedPoints,
+      };
+    }),
+  );
+
+  return results;
 }

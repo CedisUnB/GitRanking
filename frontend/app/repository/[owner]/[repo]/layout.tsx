@@ -36,14 +36,14 @@ export default async function RepositoryLayout({
   }
 
   return (
-    <div className="flex min-h-screen font-[family-name:var(--font-geist-sans)]">
+    <div className="flex h-screen overflow-hidden font-[family-name:var(--font-geist-sans)]">
       <Sidebar
         repositoryLabel={selectedRepo}
         overviewHref={`/repository/${params.owner}/${params.repo}/overview`}
         profileHref={`/repository/${params.owner}/${params.repo}/profile`}
         metricsHref={`/repository/${params.owner}/${params.repo}/metrics`}
       />
-      <div className="flex-1 bg-[#EFF0F2]">
+      <div className="flex-1 overflow-y-auto bg-[#EFF0F2]">
         <RepositoryHeader
           repoName={repoNameOnly}
           sprintTitle={currentSprintTitle}

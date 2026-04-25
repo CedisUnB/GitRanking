@@ -1,8 +1,15 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
-import { getMilestoneVelocityData } from "@/lib/github-client";
+import {
+  getMilestoneVelocityData,
+  getWorkInProgressData,
+  getSprintHistoryData,
+} from "@/lib/github-client";
 import { OracleCard, type OracleStatus } from "@/components/metrics/OracleCard";
+import { WorkInProgressCard } from "@/components/metrics/WorkInProgressCard";
+import { StoryPointsCard } from "@/components/metrics/StoryPointsCard";
+import { SprintTasksCard } from "@/components/metrics/SprintTasksCard";
 
 function computeOracleStatus(
   openCount: number,
@@ -44,19 +51,19 @@ export default async function MetricsPage({
   let daysAhead: number | undefined;
   let pageTitle = "Metrics";
 
-  try {
-    const data = await getMilestoneVelocityData(
-      params.owner,
-      params.repo,
-      session.accessToken,
-    );
+  const [velocityData, wipData, sprintHistory] = await Promise.allSettled([
+    getMilestoneVelocityData(params.owner, params.repo, session.accessToken),
+    getWorkInProgressData(params.owner, params.repo, session.accessToken),
+    getSprintHistoryData(params.owner, params.repo, session.accessToken),
+  ]);
 
+  // Oracle
+  if (velocityData.status === "fulfilled") {
+    const data = velocityData.value;
     if (data.currentMilestone) {
       pageTitle = `Metrics — ${data.currentMilestone.title}`;
 
-      if (!data.currentMilestone.dueOn) {
-        oracleStatus = "no_sprint";
-      } else {
+      if (data.currentMilestone.dueOn) {
         const result = computeOracleStatus(
           data.openCount,
           data.closedCount,
@@ -67,8 +74,23 @@ export default async function MetricsPage({
         daysAhead = result.daysAhead;
       }
     }
-  } catch (err) {
-    console.error("[metrics] Failed to load milestone data:", err);
+  } else {
+    console.error("[metrics] Failed to load velocity data:", velocityData.reason);
+  }
+
+  const wip =
+    wipData.status === "fulfilled"
+      ? wipData.value
+      : { todo: 0, doing: 0, review: 0, done: 0 };
+
+  const sprints =
+    sprintHistory.status === "fulfilled" ? sprintHistory.value : [];
+
+  if (wipData.status === "rejected") {
+    console.error("[metrics] Failed to load WIP data:", wipData.reason);
+  }
+  if (sprintHistory.status === "rejected") {
+    console.error("[metrics] Failed to load sprint history:", sprintHistory.reason);
   }
 
   return (
@@ -78,6 +100,9 @@ export default async function MetricsPage({
 
         <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
           <OracleCard status={oracleStatus} daysAhead={daysAhead} />
+          <WorkInProgressCard data={wip} />
+          <StoryPointsCard sprints={sprints} />
+          <SprintTasksCard sprints={sprints} />
         </div>
       </div>
     </main>
