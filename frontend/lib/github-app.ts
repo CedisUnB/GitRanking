@@ -118,6 +118,121 @@ export async function getUserInstallationId(
 }
 
 /**
+ * Returns the installation ID for a specific owner (org or user) using the
+ * App JWT. This is the reliable way to look up the installation for a known
+ * owner without depending on the logged-in user's token.
+ *
+ * Tries org first, falls back to user account.
+ * Returns null if the app is not installed for that owner.
+ */
+export async function getInstallationIdForOwner(
+  owner: string,
+): Promise<number | null> {
+  const appJwt = await createAppJwt();
+  const headers = {
+    Authorization: `Bearer ${appJwt}`,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+
+  // Try org installation first
+  const orgRes = await fetch(
+    `https://api.github.com/orgs/${encodeURIComponent(owner)}/installation`,
+    { headers },
+  );
+  if (orgRes.ok) {
+    const data = await orgRes.json();
+    return (data as { id: number }).id;
+  }
+
+  // Fall back to user installation
+  const userRes = await fetch(
+    `https://api.github.com/users/${encodeURIComponent(owner)}/installation`,
+    { headers },
+  );
+  if (userRes.ok) {
+    const data = await userRes.json();
+    return (data as { id: number }).id;
+  }
+
+  return null;
+}
+
+/**
+ * Returns installation IDs relevant to the logged-in user:
+ * - All org installations where the user is a member
+ * - The user's own personal installation (if it exists)
+ *
+ * Uses:
+ *  - GET /user/orgs          (OAuth token) → user's org memberships
+ *  - GET /app/installations  (App JWT)     → all installations of this app
+ */
+export async function getInstallationIdsForUser(
+  userOAuthToken: string,
+): Promise<number[]> {
+  const appJwt = await createAppJwt();
+  const appId = Number(process.env.GITHUB_APP_ID);
+
+  // Fetch user's orgs and all app installations in parallel
+  const [orgsRes, installationsRes] = await Promise.all([
+    fetch("https://api.github.com/user/orgs?per_page=100", {
+      headers: {
+        Authorization: `Bearer ${userOAuthToken}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    }),
+    fetch("https://api.github.com/app/installations?per_page=100", {
+      headers: {
+        Authorization: `Bearer ${appJwt}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    }),
+  ]);
+
+  if (!orgsRes.ok) {
+    const text = await orgsRes.text();
+    throw new Error(`Failed to fetch user orgs: ${orgsRes.status} ${text}`);
+  }
+  if (!installationsRes.ok) {
+    const text = await installationsRes.text();
+    throw new Error(`Failed to fetch app installations: ${installationsRes.status} ${text}`);
+  }
+
+  // Get the authenticated user's login so we can match their personal installation
+  const userRes = await fetch("https://api.github.com/user", {
+    headers: {
+      Authorization: `Bearer ${userOAuthToken}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+  const userLogin: string = userRes.ok
+    ? ((await userRes.json()) as { login: string }).login
+    : "";
+
+  const orgs = (await orgsRes.json()) as Array<{ login: string }>;
+  const orgLogins = new Set(orgs.map((o) => o.login.toLowerCase()));
+  if (userLogin) orgLogins.add(userLogin.toLowerCase()); // include personal account
+
+  const installations = (await installationsRes.json()) as Array<{
+    id: number;
+    app_id: number;
+    account: { login: string } | null;
+  }>;
+
+  return installations
+    .filter(
+      (i) =>
+        i.app_id === appId &&
+        i.account &&
+        orgLogins.has(i.account.login.toLowerCase()),
+    )
+    .map((i) => i.id);
+}
+
+/**
  * Returns the list of repositories the user has explicitly authorized
  * for this GitHub App installation.
  */
