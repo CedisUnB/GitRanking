@@ -525,9 +525,9 @@ async function getProjectData(
       installationToken,
     );
     projectNodes = data.organization.projectsV2.nodes;
-    console.log(
-      `[projects] org="${owner}" projects=${projectNodes.length}`,
-    );
+    // console.log(
+    //   `[projects] org="${owner}" projects=${projectNodes.length}`,
+    // );
   } catch (err) {
     console.error(
       "[projects] GraphQL failed — estimates and status will be empty:",
@@ -585,9 +585,9 @@ async function getProjectData(
     }
   }
 
-  console.log(
-    `[projects] estimateMap=${estimateMap.size} statusMap=${statusMap.size}`,
-  );
+  // console.log(
+  //   `[projects] estimateMap=${estimateMap.size} statusMap=${statusMap.size}`,
+  // );
 
   return { estimateMap, statusMap };
 }
@@ -603,6 +603,7 @@ export type WorkInProgressData = {
   doing: number;
   review: number;
   done: number;
+  sprintGoal: string;
 };
 
 const STATUS_TODO = ["todo", "to do", "backlog", "ready"];
@@ -640,7 +641,7 @@ export async function getWorkInProgressData(
   });
 
   if (!currentMilestone) {
-    return { todo: 0, doing: 0, review: 0, done: 0 };
+    return { todo: 0, doing: 0, review: 0, done: 0, sprintGoal: "" };
   }
 
   const [issues, { statusMap }] = await Promise.all([
@@ -651,7 +652,7 @@ export async function getWorkInProgressData(
     getProjectData(owner, repo, installationToken),
   ]);
 
-  const counts: WorkInProgressData = { todo: 0, doing: 0, review: 0, done: 0 };
+  const counts: WorkInProgressData = { todo: 0, doing: 0, review: 0, done: 0, sprintGoal: currentMilestone.title };
 
   for (const issue of issues) {
     if (issue.pull_request) continue;

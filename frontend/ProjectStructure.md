@@ -12,9 +12,11 @@ Next.js App Router pages and API routes.
 - `app/login/` — sign-in page
 - `app/repositories/` — repository selection page (with layout wrapper)
 - `app/repository/[owner]/[repo]/` — per-repository section; uses a fixed-height (`h-screen`) layout with a sticky sidebar and independently scrolling content area
-  - `overview/` — repository overview page
+  - `overview/` — repository overview page; fetches current sprint WIP data and renders the `SprintGoalCard`
+  - `overview/loading.tsx` — skeleton loading UI for the overview page; shown instantly by Next.js while the server fetches sprint data; mirrors the `SprintGoalCard` layout with `animate-pulse` shimmer placeholders
   - `profile/` — contributor profile page
   - `metrics/` — sprint metrics page; contains four cards: Oracle (velocity prediction), Work in Progress (donut chart), Story Points (bar chart across last 5 sprints), and Sprint Tasks Completed (bar chart across last 5 sprints)
+  - `metrics/loading.tsx` — skeleton loading UI for the metrics page; shown instantly by Next.js while the server fetches GitHub data; mirrors the 2×2 card grid with `animate-pulse` shimmer placeholders
 - `app/auth/error/` — OAuth error page
 
 #### API Routes
@@ -36,6 +38,8 @@ React components grouped by concern.
 - `components/ui/Buttons/GitHubSignInButton.tsx` — GitHub OAuth sign-in button
 - `components/ui/Buttons/SignOutButton.tsx` — sign-out button
 - `components/repository/` — repository selection form
+- `components/overview/` — overview page components
+  - `components/overview/SprintGoalCard.tsx` — displays the current sprint goal (active milestone title) alongside a 2×2 grid of issue counts by status (DONE / DOING / REVIEW / TODO), using lucide-react icons and colour-coded status cards
 - `components/metrics/OracleCard.tsx` — Oracle metric card; displays sprint velocity prediction with early/on-track/at-risk states
 - `components/metrics/WorkInProgressCard.tsx` — WIP donut chart (recharts); categorises current-sprint issues into TO-DO / DOING / REVIEW / DONE using the GitHub Projects v2 **Status** field via the organisation installation token
 - `components/metrics/StoryPointsCard.tsx` — Grouped bar chart (recharts); completed vs planned story points across the last 5 sprints; points sourced from the GitHub Projects v2 **Estimate** field
@@ -48,7 +52,7 @@ Server-side logic and utilities.
 - `lib/auth.ts` — NextAuth config with GitHub App OAuth provider (`read:user user:email` scope); upserts User on login
 - `lib/prisma.ts` — Prisma client singleton
 - `lib/github-app.ts` — GitHub App helpers: App JWT creation, installation token exchange (`getInstallationToken`), repo listing (`getInstallationRepos`), direct owner→installation lookup via App JWT (`getInstallationIdForOwner`), and user-scoped installation discovery across orgs + personal account (`getInstallationIdsForUser`)
-- `lib/github-client.ts` — GitHub REST + GraphQL API client; key exports: `getAccessibleRepositories` (repos across all user-relevant installations), `getMilestoneVelocityData` (sprint velocity), `getWorkInProgressData` (Projects v2 Status-field WIP categorisation for the current sprint), `getSprintHistoryData` (last-N-milestones task and story-point aggregation via Projects v2 Estimate field); all repo-scoped functions resolve the installation token via `getInstallationIdForOwner`
+- `lib/github-client.ts` — GitHub REST + GraphQL API client; key exports: `getAccessibleRepositories` (repos across all user-relevant installations), `getMilestoneVelocityData` (sprint velocity), `getWorkInProgressData` (Projects v2 Status-field WIP categorisation for the current sprint, also returns `sprintGoal` — the active milestone title), `getSprintHistoryData` (last-N-milestones task and story-point aggregation via Projects v2 Estimate field); all repo-scoped functions resolve the installation token via `getInstallationIdForOwner`
 - `lib/repository.ts` — upserts Repository row on page visit
 - `lib/webhooks/` — webhook event handlers (push, issues, pull requests)
 
