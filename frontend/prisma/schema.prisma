@@ -15,8 +15,8 @@ model User {
   username  String
   name      String?
   email     String?
-  avatarUrl String?
-  createdAt DateTime @default(now())
+  avatarUrl     String?
+  createdAt     DateTime @default(now())
 
   userBadges UserBadges[]
 

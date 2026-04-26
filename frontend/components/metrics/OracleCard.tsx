@@ -41,7 +41,7 @@ export function OracleCard({ status, daysAhead }: Props) {
   const message = config.message(daysAhead);
 
   return (
-    <div className="rounded-2xl border border-[#59168B]/20 bg-white p-6 shadow-sm">
+    <div className="rounded-2xl border border-[#59168B]/20 bg-[#F8F8F8] p-6 shadow-sm">
       <p className="text-center text-sm font-medium text-slate-700">Oracle</p>
 
       <div className="mt-4 flex justify-center">
