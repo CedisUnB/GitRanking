@@ -772,6 +772,66 @@ export async function getUserOngoingTasks(
 }
 
 // ---------------------------------------------------------------------------
+// User contribution stats (profile cards)
+// ---------------------------------------------------------------------------
+
+export type UserContributionStats = {
+  tasksDone: number;
+  accumulatedPoints: number;
+  sprintsDone: number;
+  commitsDone: number;
+};
+
+type GithubContributor = {
+  login: string;
+  contributions: number;
+};
+
+export async function getUserContributionStats(
+  owner: string,
+  repo: string,
+  username: string,
+  userAccessToken: string,
+): Promise<UserContributionStats> {
+  const installationId = await getInstallationIdForUser(userAccessToken, owner);
+  const installationToken = await getInstallationToken(installationId);
+
+  const [closedIssues, contributors, projectData] = await Promise.all([
+    githubPaginatedFetchJson<GithubIssue>(
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues?assignee=${encodeURIComponent(username)}&state=closed`,
+      installationToken,
+    ),
+    githubPaginatedFetchJson<GithubContributor>(
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contributors`,
+      installationToken,
+    ),
+    getProjectData(owner, repo, installationToken),
+  ]);
+
+  const issuesOnly = closedIssues.filter((i) => !i.pull_request);
+
+  const tasksDone = issuesOnly.length;
+
+  const accumulatedPoints = issuesOnly.reduce(
+    (sum, i) => sum + (projectData.estimateMap.get(i.number) ?? 0),
+    0,
+  );
+
+  const distinctMilestones = new Set<number>();
+  for (const issue of issuesOnly) {
+    if (issue.milestone) distinctMilestones.add(issue.milestone.number);
+  }
+  const sprintsDone = distinctMilestones.size;
+
+  const matched = contributors.find(
+    (c) => c.login.toLowerCase() === username.toLowerCase(),
+  );
+  const commitsDone = matched?.contributions ?? 0;
+
+  return { tasksDone, accumulatedPoints, sprintsDone, commitsDone };
+}
+
+// ---------------------------------------------------------------------------
 // Sprint history (last N milestones) — for Story Points & Sprint Tasks charts
 // ---------------------------------------------------------------------------
 
