@@ -252,7 +252,11 @@ export async function getCurrentMilestoneIssues(
   owner: string,
   repo: string,
   userAccessToken: string,
-  options?: { assignee?: string; state?: "open" | "all" },
+  options?: {
+    assignee?: string;
+    state?: "open" | "all";
+    includeOverdue?: boolean;
+  },
 ): Promise<{ currentMilestone: MilestoneDto | null; issues: IssueDto[] }> {
   const installationId = await getInstallationIdForUser(userAccessToken, owner);
   const installationToken = await getInstallationToken(installationId);
@@ -263,10 +267,17 @@ export async function getCurrentMilestoneIssues(
   );
 
   const now = Date.now();
-  const currentMilestone = milestones.find((milestone) => {
+  const future = milestones.find((milestone) => {
     if (!milestone.due_on) return false;
     return new Date(milestone.due_on).getTime() >= now;
   });
+  let overdue: GithubMilestone | undefined;
+  if (!future && options?.includeOverdue) {
+    for (const m of milestones) {
+      if (m.due_on && new Date(m.due_on).getTime() < now) overdue = m;
+    }
+  }
+  const currentMilestone = future ?? overdue;
 
   if (!currentMilestone) {
     return { currentMilestone: null, issues: [] };
@@ -330,6 +341,7 @@ export async function getMilestoneVelocityData(
   owner: string,
   repo: string,
   userAccessToken: string,
+  options?: { includeOverdue?: boolean },
 ): Promise<MilestoneVelocityData> {
   const installationId = await getInstallationIdForUser(userAccessToken, owner);
   const installationToken = await getInstallationToken(installationId);
@@ -340,10 +352,17 @@ export async function getMilestoneVelocityData(
   );
 
   const now = Date.now();
-  const currentMilestone = milestones.find((m) => {
+  const future = milestones.find((m) => {
     if (!m.due_on) return false;
     return new Date(m.due_on).getTime() >= now;
   });
+  let overdue: GithubMilestone | undefined;
+  if (!future && options?.includeOverdue) {
+    for (const m of milestones) {
+      if (m.due_on && new Date(m.due_on).getTime() < now) overdue = m;
+    }
+  }
+  const currentMilestone = future ?? overdue;
 
   if (!currentMilestone) {
     return { currentMilestone: null, openCount: 0, closedCount: 0 };
@@ -673,6 +692,83 @@ export async function getWorkInProgressData(
   }
 
   return counts;
+}
+
+// ---------------------------------------------------------------------------
+// User ongoing tasks (overview page)
+// ---------------------------------------------------------------------------
+
+export type OngoingTaskStatus = "todo" | "doing" | "review";
+
+export type OngoingTaskDto = {
+  id: number;
+  number: number;
+  title: string;
+  url: string;
+  status: OngoingTaskStatus;
+  points: number | null;
+};
+
+export async function getUserOngoingTasks(
+  owner: string,
+  repo: string,
+  username: string,
+  userAccessToken: string,
+): Promise<OngoingTaskDto[]> {
+  const installationId = await getInstallationIdForUser(userAccessToken, owner);
+  const installationToken = await getInstallationToken(installationId);
+
+  const milestones = await githubPaginatedFetchJson<GithubMilestone>(
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/milestones?state=open&sort=due_on&direction=asc`,
+    installationToken,
+  );
+
+  const now = Date.now();
+  const currentMilestone = milestones.find((m) => {
+    if (!m.due_on) return false;
+    return new Date(m.due_on).getTime() >= now;
+  });
+
+  if (!currentMilestone) return [];
+
+  const query = new URLSearchParams({
+    milestone: String(currentMilestone.number),
+    state: "open",
+    assignee: username,
+  });
+
+  const [issues, projectData] = await Promise.all([
+    githubPaginatedFetchJson<GithubIssue>(
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues?${query.toString()}`,
+      installationToken,
+    ),
+    getProjectData(owner, repo, installationToken),
+  ]);
+
+  const tasks: OngoingTaskDto[] = [];
+  for (const issue of issues) {
+    if (issue.pull_request) continue;
+    const projectStatus = projectData.statusMap.get(issue.number);
+    const wip: WipStatus = projectStatus
+      ? classifyByProjectStatus(projectStatus)
+      : "todo";
+    if (wip === "done") continue;
+    tasks.push({
+      id: issue.id,
+      number: issue.number,
+      title: issue.title,
+      url: issue.html_url,
+      status: wip,
+      points: projectData.estimateMap.get(issue.number) ?? null,
+    });
+  }
+
+  const order: OngoingTaskStatus[] = ["doing", "review", "todo"];
+  tasks.sort(
+    (a, b) => order.indexOf(a.status) - order.indexOf(b.status),
+  );
+
+  return tasks;
 }
 
 // ---------------------------------------------------------------------------

@@ -4,7 +4,14 @@ import type { ReactNode } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { RepositoryHeader } from "@/components/layout/RepositoryHeader";
 import { authOptions } from "@/lib/auth";
-import { getCurrentMilestoneIssues } from "@/lib/github-client";
+import {
+  getCurrentMilestoneIssues,
+  getMilestoneVelocityData,
+} from "@/lib/github-client";
+import {
+  computeSprintProgress,
+  type SprintProgress,
+} from "@/lib/sprint-progress";
 
 export default async function RepositoryLayout({
   children,
@@ -22,17 +29,46 @@ export default async function RepositoryLayout({
 
   let currentSprintTitle: string | null = null;
   let currentIssueTitle: string | null = null;
-  try {
-    const sprintData = await getCurrentMilestoneIssues(
+  let sprintProgress: SprintProgress = { hasSprint: false };
+
+  const [sprintResult, velocityResult] = await Promise.allSettled([
+    getCurrentMilestoneIssues(
       params.owner,
       params.repo,
       session.accessToken,
-      { state: "open" }
+      { state: "open", includeOverdue: true },
+    ),
+    getMilestoneVelocityData(
+      params.owner,
+      params.repo,
+      session.accessToken,
+      { includeOverdue: true },
+    ),
+  ]);
+
+  if (sprintResult.status === "fulfilled") {
+    currentSprintTitle = sprintResult.value.currentMilestone?.title ?? null;
+    currentIssueTitle = sprintResult.value.issues[0]?.title ?? null;
+  } else {
+    console.error(
+      "[repo layout] Failed to load current milestone:",
+      sprintResult.reason,
     );
-    currentSprintTitle = sprintData.currentMilestone?.title ?? null;
-    currentIssueTitle = sprintData.issues[0]?.title ?? null;
-  } catch (error) {
-    console.error("[repo layout] Failed to load current milestone:", error);
+  }
+
+  if (velocityResult.status === "fulfilled") {
+    const { currentMilestone, openCount, closedCount } = velocityResult.value;
+    sprintProgress = computeSprintProgress({
+      openCount,
+      closedCount,
+      sprintStart: currentMilestone?.createdAt ?? null,
+      sprintEnd: currentMilestone?.dueOn ?? null,
+    });
+  } else {
+    console.error(
+      "[repo layout] Failed to load velocity data:",
+      velocityResult.reason,
+    );
   }
 
   return (
@@ -48,6 +84,7 @@ export default async function RepositoryLayout({
           repoName={repoNameOnly}
           sprintTitle={currentSprintTitle}
           issueTitle={currentIssueTitle}
+          sprintProgress={sprintProgress}
         />
         <div className="px-6 py-8">{children}</div>
       </div>
