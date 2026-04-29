@@ -3,7 +3,12 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import { upsertRepository } from "@/lib/repository";
-import { getAuthenticatedUserProfile } from "@/lib/github-client";
+import {
+  getAuthenticatedUserProfile,
+  getUserContributionStats,
+  type UserContributionStats,
+} from "@/lib/github-client";
+import { ProfileStatsCards } from "@/components/overview/ProfileStatsCards";
 
 type GitHubUserProfile = {
   name: string | null;
@@ -40,6 +45,27 @@ export default async function RepositoryProfile({
     console.error("[profile] Failed to load GitHub profile:", error);
   }
 
+  const username = user.username ?? "";
+  let stats: UserContributionStats = {
+    tasksDone: 0,
+    accumulatedPoints: 0,
+    sprintsDone: 0,
+    commitsDone: 0,
+  };
+
+  if (username) {
+    try {
+      stats = await getUserContributionStats(
+        owner,
+        repo,
+        username,
+        session.accessToken,
+      );
+    } catch (error) {
+      console.error("[profile] Failed to load contribution stats:", error);
+    }
+  }
+
   const displayName = githubProfile?.name ?? user.name ?? "";
   const displayEmail = githubProfile?.email ?? user.email ?? "";
   const avatarSrc = githubProfile?.avatar_url ?? user.image ?? null;
@@ -61,7 +87,7 @@ export default async function RepositoryProfile({
     .join("");
 
   return (
-    <main className="mx-auto max-w-6xl">
+    <main className="mx-auto max-w-6xl space-y-6">
       <div className="rounded-[24px] border border-black/10 bg-white px-6 py-6 shadow-sm">
         <div className="flex flex-col gap-6 md:flex-row md:items-start">
           {avatarSrc ? (
@@ -118,6 +144,8 @@ export default async function RepositoryProfile({
           </div>
         </div>
       </div>
+
+      <ProfileStatsCards stats={stats} />
     </main>
   );
 }

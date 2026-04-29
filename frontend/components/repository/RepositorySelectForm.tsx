@@ -199,7 +199,7 @@ export function RepositorySelectBlock() {
           <a
             href={
               installUrl ??
-              "https://github.com/apps/tcc-gitrank-localteste/installations/new"
+              process.env.GITHUB_APP_INSTALLATION_URL
             }
             target="_blank"
             rel="noopener noreferrer"
@@ -225,14 +225,14 @@ export function RepositorySelectBlock() {
           are shown.
           <br />
           To change which repositories are accessible,{" "}
-          <Link
-            href="https://github.com/apps/tcc-gitrank-localteste/installations/new"
+          <a
+            href={process.env.GITHUB_APP_INSTALLATION_URL}
             className="text-violet-600 underline"
             target="_blank"
             rel="noopener noreferrer"
           >
             manage your installation
-          </Link>
+          </a>
           .
         </p>
       )}
