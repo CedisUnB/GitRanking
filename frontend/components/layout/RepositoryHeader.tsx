@@ -1,11 +1,15 @@
+import type { SprintProgress } from "@/lib/sprint-progress";
+
 export function RepositoryHeader({
   repoName,
   sprintTitle,
   issueTitle,
+  sprintProgress,
 }: {
   repoName: string;
   sprintTitle?: string | null;
   issueTitle?: string | null;
+  sprintProgress?: SprintProgress;
 }) {
   const sprintText =
     sprintTitle && sprintTitle.trim().length > 0
@@ -16,8 +20,24 @@ export function RepositoryHeader({
       ? issueTitle
       : "No open issues in this sprint";
 
-  // Placeholder visual (sem logica ainda)
-  const progressPercent = 65;
+  const hasSprint = sprintProgress?.hasSprint === true;
+  const barPercent = hasSprint ? sprintProgress.percent : 100;
+
+  let progressLabel: string;
+  if (!hasSprint) {
+    progressLabel = "No active sprint";
+  } else {
+    const { percent, daysElapsed, daysTotal, daysRemaining, isOverdue } =
+      sprintProgress;
+    const remainingAbs = Math.abs(daysRemaining);
+    const tail = isOverdue
+      ? `Past due by ${remainingAbs} day${remainingAbs === 1 ? "" : "s"}`
+      : `Ends in ${daysRemaining} day${daysRemaining === 1 ? "" : "s"}`;
+    progressLabel = `${percent}% - Day ${daysElapsed}/${daysTotal} | ${tail}`;
+  }
+
+  const labelColorClass =
+    hasSprint && sprintProgress.isOverdue ? "text-red-600" : "text-slate-600";
 
   return (
     <header className="border-b border-black/5 bg-white">
@@ -38,15 +58,15 @@ export function RepositoryHeader({
                 <div
                   className="h-[9px]"
                   style={{
-                    width: `${progressPercent}%`,
+                    width: `${barPercent}%`,
                     background:
                       "linear-gradient(90deg, #8200DB 0%, rgba(130, 0, 219, 0.59) 100%)",
                     borderRadius: "10px 0px 0px 10px",
                   }}
                 />
               </div>
-              <p className="mt-2 text-xs font-medium text-slate-600">
-                {progressPercent}% - Day 7/10 | Ends in 3 days
+              <p className={`mt-2 text-xs font-medium ${labelColorClass}`}>
+                {progressLabel}
               </p>
             </div>
           </div>

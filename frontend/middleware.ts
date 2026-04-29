@@ -25,7 +25,11 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+    secureCookie: process.env.NEXTAUTH_URL?.startsWith("https://"),
+  });
 
   // Authenticated user visiting /login → redirect to repositories
   if (token && pathname === "/login") {
