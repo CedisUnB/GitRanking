@@ -9,6 +9,8 @@ import {
   type UserContributionStats,
 } from "@/lib/github-client";
 import { ProfileStatsCards } from "@/components/overview/ProfileStatsCards";
+import { AchievementsSection } from "@/components/profile/AchievementsSection";
+import { getUserBadgesForRepo } from "@/lib/badges";
 
 type GitHubUserProfile = {
   name: string | null;
@@ -65,6 +67,12 @@ export default async function RepositoryProfile({
       console.error("[profile] Failed to load contribution stats:", error);
     }
   }
+
+  const { allBadges, earnedBadgeIds } = await getUserBadgesForRepo(
+    username,
+    owner,
+    repo,
+  );
 
   const displayName = githubProfile?.name ?? user.name ?? "";
   const displayEmail = githubProfile?.email ?? user.email ?? "";
@@ -146,6 +154,8 @@ export default async function RepositoryProfile({
       </div>
 
       <ProfileStatsCards stats={stats} />
+
+      <AchievementsSection allBadges={allBadges} earnedBadgeIds={earnedBadgeIds} />
     </main>
   );
 }

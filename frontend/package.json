@@ -9,6 +9,9 @@
     "lint": "next lint",
     "prisma": "prisma"
   },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
   "dependencies": {
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
