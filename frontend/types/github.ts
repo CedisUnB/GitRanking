@@ -69,3 +69,12 @@ export type AssignedOpenIssuesResponse = {
   assignee: string;
   issues: IssueDto[];
 };
+
+export type HeroOfSprintOverviewResponse = {
+  previousHero: {
+    displayName: string;
+    sprintTitle: string;
+  } | null;
+  currentSprint: { title: string; githubId: string } | null;
+  hasVoted: boolean;
+};

@@ -2,13 +2,21 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import {
+  getHeroSprintMilestoneContext,
   getWorkInProgressData,
   getUserOngoingTasks,
   type WorkInProgressData,
   type OngoingTaskDto,
 } from "@/lib/github-client";
+import {
+  findRepositoryByOwnerAndName,
+  resolveHeroOfSprintOverview,
+} from "@/lib/hero-of-sprint";
+import { upsertRepository } from "@/lib/repository";
 import { SprintGoalCard } from "@/components/overview/SprintGoalCard";
+import { HeroOfSprintCard } from "@/components/overview/HeroOfSprintCard";
 import { OngoingTasksCard } from "@/components/overview/OngoingTasksCard";
+import type { HeroOfSprintOverviewResponse } from "@/types/github";
 
 const EMPTY_WIP: WorkInProgressData = {
   todo: 0,
@@ -28,17 +36,32 @@ export default async function RepositoryOverview({
 
   const username = session.user?.username ?? "";
 
-  const [wipResult, tasksResult] = await Promise.allSettled([
-    getWorkInProgressData(params.owner, params.repo, session.accessToken),
-    username
-      ? getUserOngoingTasks(
-          params.owner,
-          params.repo,
-          username,
-          session.accessToken,
-        )
-      : Promise.resolve<OngoingTaskDto[]>([]),
+  await upsertRepository(params.owner, params.repo, session.accessToken);
+
+  const [wipTasksResults, milestoneCtx, repoRow] = await Promise.all([
+    Promise.allSettled([
+      getWorkInProgressData(params.owner, params.repo, session.accessToken),
+      username
+        ? getUserOngoingTasks(
+            params.owner,
+            params.repo,
+            username,
+            session.accessToken,
+          )
+        : Promise.resolve<OngoingTaskDto[]>([]),
+    ]),
+    getHeroSprintMilestoneContext(
+      params.owner,
+      params.repo,
+      session.accessToken,
+    ).catch((err) => {
+      console.error("[overview] Failed to load sprint milestones:", err);
+      return null;
+    }),
+    findRepositoryByOwnerAndName(params.owner, params.repo),
   ]);
+
+  const [wipResult, tasksResult] = wipTasksResults;
 
   const wipData =
     wipResult.status === "fulfilled" ? wipResult.value : EMPTY_WIP;
@@ -57,6 +80,20 @@ export default async function RepositoryOverview({
     );
   }
 
+  const emptyHero: HeroOfSprintOverviewResponse = {
+    previousHero: null,
+    currentSprint: null,
+    hasVoted: false,
+  };
+
+  const heroInitial: HeroOfSprintOverviewResponse = milestoneCtx
+    ? await resolveHeroOfSprintOverview(
+        milestoneCtx,
+        repoRow,
+        session.user?.githubId ?? null,
+      )
+    : emptyHero;
+
   return (
     <main className="mx-auto max-w-6xl">
       <div className="grid gap-6 lg:grid-cols-3">
@@ -65,6 +102,11 @@ export default async function RepositoryOverview({
         </div>
         <div className="space-y-6">
           <SprintGoalCard data={wipData} />
+          <HeroOfSprintCard
+            owner={params.owner}
+            repo={params.repo}
+            initialData={heroInitial}
+          />
         </div>
       </div>
     </main>

@@ -81,7 +81,7 @@ export default async function MetricsPage({
   const wip =
     wipData.status === "fulfilled"
       ? wipData.value
-      : { todo: 0, doing: 0, review: 0, done: 0 };
+      : { todo: 0, doing: 0, review: 0, done: 0, sprintGoal: "" };
 
   const sprints =
     sprintHistory.status === "fulfilled" ? sprintHistory.value : [];
