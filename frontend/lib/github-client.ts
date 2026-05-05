@@ -36,6 +36,8 @@ type GithubIssue = {
 };
 
 type GithubMilestone = {
+  /** Present on milestone list API; may be omitted on embedded issue milestone. */
+  id?: number;
   number: number;
   title: string;
   due_on: string | null;
@@ -297,6 +299,65 @@ export async function getCurrentMilestoneIssues(
   return {
     currentMilestone: toMilestoneDto(currentMilestone),
     issues: issues.filter((issue) => !issue.pull_request).map(toIssueDto),
+  };
+}
+
+export type HeroSprintMilestoneRef = {
+  githubId: string;
+  title: string;
+};
+
+export type HeroSprintMilestoneContext = {
+  current: HeroSprintMilestoneRef | null;
+  previous: HeroSprintMilestoneRef | null;
+};
+
+/**
+ * Current sprint: same rule as layout/velocity (open milestone with future due date,
+ * or most recent overdue open milestone when includeOverdue applies).
+ * Previous sprint: most recently closed milestone by due date (GitHub sort).
+ */
+export async function getHeroSprintMilestoneContext(
+  owner: string,
+  repo: string,
+  userAccessToken: string,
+): Promise<HeroSprintMilestoneContext> {
+  const installationId = await getInstallationIdForUser(userAccessToken, owner);
+  const installationToken = await getInstallationToken(installationId);
+
+  const openMilestones = await githubPaginatedFetchJson<GithubMilestone>(
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/milestones?state=open&sort=due_on&direction=asc`,
+    installationToken,
+  );
+
+  const now = Date.now();
+  const future = openMilestones.find((milestone) => {
+    if (!milestone.due_on) return false;
+    return new Date(milestone.due_on).getTime() >= now;
+  });
+  let overdue: GithubMilestone | undefined;
+  if (!future) {
+    for (const m of openMilestones) {
+      if (m.due_on && new Date(m.due_on).getTime() < now) overdue = m;
+    }
+  }
+  const currentRaw = future ?? overdue;
+
+  const closedSlice = await githubFetchJson<GithubMilestone[]>(
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/milestones?state=closed&sort=due_on&direction=desc&per_page=1`,
+    installationToken,
+  );
+  const previousRaw = closedSlice[0] ?? null;
+
+  return {
+    current:
+      currentRaw && currentRaw.id != null
+        ? { githubId: String(currentRaw.id), title: currentRaw.title }
+        : null,
+    previous:
+      previousRaw && previousRaw.id != null
+        ? { githubId: String(previousRaw.id), title: previousRaw.title }
+        : null,
   };
 }
 
