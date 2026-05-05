@@ -19,6 +19,8 @@ model User {
   createdAt     DateTime @default(now())
 
   userBadges UserBadges[]
+  userStats  UserStats[]
+  sprintParticipations UserSprintParticipation[]
 
   votesForHeroOfSprints VotesForHeroOfSprint[] @relation("VotesForHeroOfSprint_voter")
 
@@ -33,15 +35,17 @@ model User {
 model Repository {
   id              String   @id @default(cuid())
   githubRepoId    String   @unique  // numeric GitHub repo ID — stable across renames
-  owner           String            
-  name            String            
-  fullName        String            
+  owner           String
+  name            String
+  fullName        String
   private         Boolean
   firstAccessedAt DateTime @default(now())
 
   userBadges            UserBadges[]
   recognitionMessages   RecognitionMessage[]
   votesForHeroOfSprints VotesForHeroOfSprint[]
+  userStats             UserStats[]
+  sprintParticipations  UserSprintParticipation[]
 }
 
 model Badges {
@@ -92,4 +96,33 @@ model RecognitionMessage {
   sender     User        @relation("Recognition_sender", fields: [senderId], references: [id])
   recipient  User        @relation("Recognition_recipient", fields: [recipientId], references: [id])
   repository Repository? @relation(fields: [repositoryId], references: [id])
+}
+
+model UserStats {
+  id            String   @id @default(cuid())
+  userId        String
+  repositoryId  String
+  issuesClosed  Int      @default(0)
+  issuesCreated Int      @default(0)
+  bugsClosed    Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id])
+  repository Repository @relation(fields: [repositoryId], references: [id])
+
+  @@unique([userId, repositoryId])
+}
+
+model UserSprintParticipation {
+  id           String   @id @default(cuid())
+  userId       String
+  repositoryId String
+  milestoneId  String
+  createdAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id])
+  repository Repository @relation(fields: [repositoryId], references: [id])
+
+  @@unique([userId, repositoryId, milestoneId])
 }
