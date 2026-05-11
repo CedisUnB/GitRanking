@@ -10,16 +10,19 @@ export function Sidebar({
   overviewHref,
   profileHref,
   metricsHref,
+  teamHref,
 }: {
   repositoryLabel: string;
   overviewHref?: string;
   profileHref?: string;
   metricsHref?: string;
+  teamHref?: string;
 }) {
   const pathname = usePathname();
   const isOverviewActive = Boolean(overviewHref && pathname === overviewHref);
   const isProfileActive = Boolean(profileHref && pathname === profileHref);
   const isMetricsActive = Boolean(metricsHref && pathname === metricsHref);
+  const isTeamActive = Boolean(teamHref && pathname === teamHref);
   const activeClass = "text-[#3C0366] underline underline-offset-4";
   const inactiveClass = "text-slate-500 hover:text-slate-700";
   const repoNameOnly = repositoryLabel.split("/").pop() ?? repositoryLabel;
@@ -97,9 +100,7 @@ export function Sidebar({
             </div>
           )}
 
-          <SignOutButton
-            className="mt-8 w-fit text-left text-base font-medium leading-6 text-red-600 transition hover:text-red-700"
-          >
+          <SignOutButton className="mt-8 w-fit text-left text-base font-medium leading-6 text-red-600 transition hover:text-red-700">
             Log out
           </SignOutButton>
         </nav>
@@ -119,9 +120,23 @@ export function Sidebar({
               <p className="max-w-[151px] truncate text-sm font-normal leading-[22px] text-[#637381]">
                 {repoNameOnly}
               </p>
-              <p className="text-base font-medium leading-6 text-[#59168B]">
-                Team and Members
-              </p>
+              {teamHref ? (
+                <Link
+                  href={teamHref}
+                  className={`text-base font-medium leading-6 transition ${
+                    isTeamActive ? activeClass : inactiveClass
+                  }`}
+                >
+                  Team and Members
+                </Link>
+              ) : (
+                <div
+                  className="cursor-not-allowed text-base font-medium leading-6 text-slate-400"
+                  aria-disabled
+                >
+                  Team and Members
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -129,4 +144,3 @@ export function Sidebar({
     </aside>
   );
 }
-
