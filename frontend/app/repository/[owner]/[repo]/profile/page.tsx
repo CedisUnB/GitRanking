@@ -10,7 +10,9 @@ import {
 } from "@/lib/github-client";
 import { ProfileStatsCards } from "@/components/overview/ProfileStatsCards";
 import { AchievementsSection } from "@/components/profile/AchievementsSection";
+import { RecognitionsSection } from "@/components/profile/RecognitionsSection";
 import { getUserBadgesForRepo } from "@/lib/badges";
+import { prisma } from "@/lib/prisma";
 
 type GitHubUserProfile = {
   name: string | null;
@@ -73,6 +75,22 @@ export default async function RepositoryProfile({
     owner,
     repo,
   );
+
+  const dbUser = username
+    ? await prisma.user.findFirst({ where: { username } })
+    : null;
+  const repository = dbUser
+    ? await prisma.repository.findFirst({ where: { owner, name: repo } })
+    : null;
+
+  const recognitions =
+    dbUser && repository
+      ? await prisma.recognitionMessage.findMany({
+          where: { recipientId: dbUser.id, repositoryId: repository.id },
+          orderBy: { createdAt: "desc" },
+          include: { sender: { select: { username: true, name: true } } },
+        })
+      : [];
 
   const displayName = githubProfile?.name ?? user.name ?? "";
   const displayEmail = githubProfile?.email ?? user.email ?? "";
@@ -156,6 +174,8 @@ export default async function RepositoryProfile({
       <ProfileStatsCards stats={stats} />
 
       <AchievementsSection allBadges={allBadges} earnedBadgeIds={earnedBadgeIds} />
+
+      <RecognitionsSection recognitions={recognitions} />
     </main>
   );
 }

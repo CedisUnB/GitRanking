@@ -10,7 +10,16 @@ const BADGE_NAMES = {
   SPRINT_5: "sprint5",
   SPRINT_10: "sprint10",
   ALL_TASKS: "all_tasks",
+  RECOGNITION_INNOVATION: "recognition_innovation",
+  RECOGNITION_LEADERSHIP: "recognition_leadership",
+  RECOGNITION_TEAMWORK: "recognition_teamwork",
 } as const;
+
+const RECOGNITION_BADGE_MAP: Record<string, string> = {
+  innovation: BADGE_NAMES.RECOGNITION_INNOVATION,
+  leadership: BADGE_NAMES.RECOGNITION_LEADERSHIP,
+  teamwork: BADGE_NAMES.RECOGNITION_TEAMWORK,
+};
 
 async function awardBadge(userId: string, repositoryId: string, badgeName: string) {
   const badge = await prisma.badges.findUnique({ where: { name: badgeName } });
@@ -58,6 +67,23 @@ export async function awardAllTasksBadgeToMilestoneParticipants(
 
   for (const { userId } of participants) {
     await awardBadge(userId, repositoryId, BADGE_NAMES.ALL_TASKS);
+  }
+}
+
+export async function awardRecognitionBadge(
+  recipientId: string,
+  repositoryId: string,
+  reason: string,
+) {
+  const badgeName = RECOGNITION_BADGE_MAP[reason.toLowerCase()];
+  if (!badgeName) return;
+
+  const count = await prisma.recognitionMessage.count({
+    where: { recipientId, repositoryId, reason: reason.toLowerCase() },
+  });
+
+  if (count === 1) {
+    await awardBadge(recipientId, repositoryId, badgeName);
   }
 }
 

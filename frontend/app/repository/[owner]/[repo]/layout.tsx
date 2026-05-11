@@ -78,6 +78,7 @@ export default async function RepositoryLayout({
         overviewHref={`/repository/${params.owner}/${params.repo}/overview`}
         profileHref={`/repository/${params.owner}/${params.repo}/profile`}
         metricsHref={`/repository/${params.owner}/${params.repo}/metrics`}
+        teamHref={`/repository/${params.owner}/${params.repo}/team`}
       />
       <div className="flex-1 overflow-y-auto bg-[#EFF0F2]">
         <RepositoryHeader
