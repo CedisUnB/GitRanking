@@ -173,9 +173,14 @@ export default async function RepositoryProfile({
 
       <ProfileStatsCards stats={stats} />
 
-      <AchievementsSection allBadges={allBadges} earnedBadgeIds={earnedBadgeIds} />
-
-      <RecognitionsSection recognitions={recognitions} />
+      <div className="flex flex-col gap-6 md:flex-row md:items-start">
+        <div className="flex-1">
+          <AchievementsSection allBadges={allBadges} earnedBadgeIds={earnedBadgeIds} />
+        </div>
+        <div className="flex-1">
+          <RecognitionsSection recognitions={recognitions} />
+        </div>
+      </div>
     </main>
   );
 }
