@@ -10,6 +10,9 @@ const BADGE_DISPLAY: Record<string, { label: string; condition: string }> = {
   sprint5: { label: "Route specialist", condition: "5 Sprints Participated" },
   sprint10: { label: "Spint Oracle", condition: "10 Sprints Participated" }, 
   all_tasks: { label: "Team Finisher", condition: "All Sprint Tasks Done" },
+  recognition_innovation: { label: "Innovator", condition: "Recognized for Innovation" },
+  recognition_leadership: { label: "Leader", condition: "Recognized for Leadership" },
+  recognition_teamwork: { label: "Team Player", condition: "Recognized for Teamwork" },
 };
 
 type Badge = {
