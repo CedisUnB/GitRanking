@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { RepositoryMemberDto } from "@/types/github";
+import { fireRecognitionCreatedConfetti } from "@/lib/recognitionConfetti";
 
 const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
   admin: { bg: "bg-yellow-100", text: "text-yellow-800" },
@@ -51,6 +52,9 @@ function GiveRecognitionModal({
         const data = await res.json();
         setError(data.error ?? "Failed to send recognition.");
         return;
+      }
+      if (res.status === 201) {
+        fireRecognitionCreatedConfetti();
       }
       onClose();
     } catch {
