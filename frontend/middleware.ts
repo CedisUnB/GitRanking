@@ -11,16 +11,29 @@ export async function middleware(req: NextRequest) {
 
   const { pathname } = req.nextUrl;
 
+  // Strip the `iss` param from the GitHub OAuth callback to prevent openid-client
+  // from treating GitHub's non-OIDC response as an OIDC issuer check, which causes
+  // "TypeError: issuer must be configured on the issuer".
+  if (pathname === "/api/auth/callback/github" && req.nextUrl.searchParams.has("iss")) {
+    const url = req.nextUrl.clone();
+    url.searchParams.delete("iss");
+    return NextResponse.redirect(url);
+  }
+
   // Let NextAuth API routes and static assets through unconditionally
   if (pathname.startsWith("/api/auth")) {
     return NextResponse.next();
   }
 
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+    secureCookie: process.env.NEXTAUTH_URL?.startsWith("https://"),
+  });
 
-  // Authenticated user visiting /login → redirect to profile
+  // Authenticated user visiting /login → redirect to repositories
   if (token && pathname === "/login") {
-    return NextResponse.redirect(new URL("/profile", req.url));
+    return NextResponse.redirect(new URL("/repositories", req.url));
   }
 
   // Unauthenticated user visiting a protected route → redirect to login
