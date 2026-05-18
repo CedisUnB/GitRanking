@@ -22,17 +22,24 @@ function percentChange(current: number, previous: number): number | null {
 }
 
 export function StoryPointsCard({ sprints }: Props) {
-  const chartData = sprints.map((s) => ({
-    name: s.milestone.title,
-    "Completed points": s.completedPoints,
-    "Planned points": s.totalPoints,
-  }));
-
-  const last = sprints[sprints.length - 1];
-  const prev = sprints[sprints.length - 2];
+  const chartData = sprints
+    .map((s) => ({
+      name: s.milestone.title,
+      "Completed points": s.completedPoints,
+      "Planned points": s.totalPoints,
+      date: s.milestone.dueOn,
+    }))
+    .sort((a, b) => {
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
+  
+  const last = chartData[chartData.length - 1];
+  const prev = chartData[chartData.length - 2];
   const change =
     last && prev
-      ? percentChange(last.completedPoints, prev.completedPoints)
+      ? percentChange(last["Completed points"], prev["Completed points"])
       : null;
 
   return (
@@ -73,6 +80,9 @@ export function StoryPointsCard({ sprints }: Props) {
                 tick={{ fontSize: 11, fill: "#9CA3AF" }}
                 axisLine={false}
                 tickLine={false}
+                tickFormatter={(v: string) =>
+                  v.length > 12 ? v.slice(0, 12) + "…" : v
+                }
               />
               <YAxis
                 tick={{ fontSize: 11, fill: "#9CA3AF" }}
@@ -96,13 +106,13 @@ export function StoryPointsCard({ sprints }: Props) {
                 wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
               />
               <Bar
-                dataKey="Completed points"
-                fill="#7C3AED"
+                dataKey="Planned points"
+                fill="#D1D5DB"
                 radius={[3, 3, 0, 0]}
               />
               <Bar
-                dataKey="Planned points"
-                fill="#D1D5DB"
+                dataKey="Completed points"
+                fill="#7C3AED"
                 radius={[3, 3, 0, 0]}
               />
             </BarChart>
