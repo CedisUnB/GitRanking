@@ -15,10 +15,6 @@ export function RepositoryHeader({
     sprintTitle && sprintTitle.trim().length > 0
       ? sprintTitle
       : "No sprints created yet";
-  const issueText =
-    issueTitle && issueTitle.trim().length > 0
-      ? issueTitle
-      : "No open issues in this sprint";
 
   const hasSprint = sprintProgress?.hasSprint === true;
   const barPercent = hasSprint ? sprintProgress.percent : 100;
@@ -50,7 +46,7 @@ export function RepositoryHeader({
 
           <div className="mt-1 flex min-w-0 items-start gap-4">
             <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-700">
-              {`${sprintText} = "${issueText}"`}
+              {`${sprintText}`}
             </p>
 
             <div className="shrink-0">
