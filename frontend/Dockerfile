@@ -16,6 +16,9 @@ COPY prisma.config.ts ./prisma.config.ts
 
 RUN npm ci --include=dev
 
+ARG CACHE_BUST
+RUN echo "cache-bust: $CACHE_BUST" > /dev/null
+
 COPY . .
 
 RUN npm run build
