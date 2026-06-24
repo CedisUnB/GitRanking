@@ -43,14 +43,18 @@ export default function Login() {
           </div>
         </section>
         <footer className="mt-12 flex w-full items-center justify-center gap-12 pb-2">
-          <Image src="/brands/unb_logo.png" alt="UnB"
-            width={170}
-            height={80}
-            className="h-16 w-auto opacity-95" />
-          <Image src="/brands/cedis_logo.png" alt="CEDIS"
-            width={290}
-            height={110}
-            className="h-24 w-auto opacity-95" />
+          <Link href="https://www.unb.br" target="_blank" rel="noopener noreferrer">
+            <Image src="/brands/unb_logo.png" alt="UnB"
+              width={170}
+              height={80}
+              className="h-16 w-auto opacity-95 transition-opacity hover:opacity-100" />
+          </Link>
+          <Link href="https://cedis.unb.br" target="_blank" rel="noopener noreferrer">
+            <Image src="/brands/cedis_logo.png" alt="CEDIS"
+              width={290}
+              height={110}
+              className="h-24 w-auto opacity-95 transition-opacity hover:opacity-100" />
+          </Link>
         </footer>
       </div>
     </main>
