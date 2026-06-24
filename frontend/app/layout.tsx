@@ -17,6 +17,10 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: "GitRanking",
   description: "Sync your GitHub, view your Kanban board, earn badges, and climb the team leaderboard.",
+  icons: {
+    icon: "/brands/logo-main.png",
+    apple: "/brands/logo-main.png",
+  },
 };
 
 export default function RootLayout({
