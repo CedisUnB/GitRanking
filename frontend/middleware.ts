@@ -31,16 +31,17 @@ export async function middleware(req: NextRequest) {
     secureCookie: process.env.NEXTAUTH_URL?.startsWith("https://"),
   });
 
+  const baseUrl = process.env.NEXTAUTH_URL ?? req.url;
+
   // Authenticated user visiting /login → redirect to repositories
   if (token && pathname === "/login") {
-    return NextResponse.redirect(new URL("/repositories", req.url));
+    return NextResponse.redirect(new URL("/repositories", baseUrl));
   }
 
   // Unauthenticated user visiting a protected route → redirect to login
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   if (!token && !isPublic) {
-    const loginUrl = new URL("/login", req.url);
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.redirect(new URL("/login", baseUrl));
   }
 
   return NextResponse.next();

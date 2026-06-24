@@ -1,0 +1,87 @@
+#!/usr/bin/env sh
+
+set -eu
+
+staged_files="$(git diff --cached --name-only --diff-filter=ACMR)"
+
+if [ -z "${staged_files}" ]; then
+  exit 0
+fi
+
+blocked_files=""
+force_added_ignored=""
+
+append_line() {
+  current_value="$1"
+  new_line="$2"
+
+  if [ -n "${current_value}" ]; then
+    printf '%s\n%s' "${current_value}" "${new_line}"
+  else
+    printf '%s' "${new_line}"
+  fi
+}
+
+while IFS= read -r file_path; do
+  [ -n "${file_path}" ] || continue
+
+  case "${file_path}" in
+    .deploy_production.defaults|*/.deploy_production.defaults)
+      blocked_files="$(append_line "${blocked_files}" "- ${file_path} (deploy defaults file)")"
+      continue
+      ;;
+    .env|*/.env|.env.*|*/.env.*)
+      case "${file_path}" in
+        *.example)
+          ;;
+        *)
+          blocked_files="$(append_line "${blocked_files}" "- ${file_path} (environment file)")"
+          continue
+          ;;
+      esac
+      ;;
+  esac
+
+  case "${file_path}" in
+    .envrc|*/.envrc|.direnv/*|*/.direnv/*)
+      blocked_files="$(append_line "${blocked_files}" "- ${file_path} (direnv local configuration)")"
+      ;;
+    *.pem|*.key|*.crt|*.cer|*.csr|*.p12|*.pfx)
+      blocked_files="$(append_line "${blocked_files}" "- ${file_path} (certificate or key material)")"
+      ;;
+    .vscode/settings.json|.vscode/launch.json|.vscode/tasks.json|*/.vscode/settings.json|*/.vscode/launch.json|*/.vscode/tasks.json|.idea/*|*/.idea/*|*.iml|.fleet/*|*/.fleet/*|.history/*|*/.history/*)
+      blocked_files="$(append_line "${blocked_files}" "- ${file_path} (local IDE/workspace file)")"
+      ;;
+    *.sqlite|*.sqlite-*|*.db|*.db-*)
+      blocked_files="$(append_line "${blocked_files}" "- ${file_path} (local database file)")"
+      ;;
+  esac
+done <<EOF
+${staged_files}
+EOF
+
+while IFS= read -r ignored_path; do
+  [ -n "${ignored_path}" ] || continue
+  force_added_ignored="$(append_line "${force_added_ignored}" "- ${ignored_path}")"
+done <<EOF
+$(printf '%s\n' "${staged_files}" | git check-ignore --stdin || true)
+EOF
+
+if [ -n "${blocked_files}" ] || [ -n "${force_added_ignored}" ]; then
+  printf '%s\n' 'Commit blocked: local-only or sensitive files are staged.' >&2
+
+  if [ -n "${blocked_files}" ]; then
+    printf '\n%s\n' 'Blocked paths:' >&2
+    printf '%s\n' "${blocked_files}" >&2
+  fi
+
+  if [ -n "${force_added_ignored}" ]; then
+    printf '\n%s\n' 'Ignored files were force-added:' >&2
+    printf '%s\n' "${force_added_ignored}" >&2
+  fi
+
+  printf '\n%s\n' 'Use git restore --staged <file> to unstage them.' >&2
+  exit 1
+fi
+
+exit 0

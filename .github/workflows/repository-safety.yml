@@ -1,0 +1,85 @@
+name: Repository Safety
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  local-artifacts-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Fail on local-only or sensitive tracked files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          blocked_patterns=(
+            '.deploy_production.defaults'
+            '.env'
+            '.env.*'
+            '*.pem'
+            '*.key'
+            '*.crt'
+            '*.cer'
+            '*.csr'
+            '*.p12'
+            '*.pfx'
+            '.envrc'
+            '.direnv/*'
+            '.vscode/settings.json'
+            '.vscode/launch.json'
+            '.vscode/tasks.json'
+            '.idea/*'
+            '*.iml'
+            '.fleet/*'
+            '.history/*'
+            '*.sqlite'
+            '*.sqlite-*'
+            '*.db'
+            '*.db-*'
+          )
+
+          allowed_patterns=(
+            '.env.example'
+            '.env.*.example'
+            '.deploy_production.defaults.example'
+          )
+
+          matches_pattern() {
+            local path="$1"
+            shift
+
+            local pattern
+            for pattern in "$@"; do
+              if [[ "$path" == $pattern ]] || [[ "$path" == */$pattern ]]; then
+                return 0
+              fi
+            done
+
+            return 1
+          }
+
+          violations=()
+          while IFS= read -r tracked_file; do
+            [[ -n "$tracked_file" ]] || continue
+
+            if matches_pattern "$tracked_file" "${blocked_patterns[@]}"; then
+              if matches_pattern "$tracked_file" "${allowed_patterns[@]}"; then
+                continue
+              fi
+
+              violations+=("$tracked_file")
+            fi
+          done < <(git ls-files)
+
+          if (( ${#violations[@]} > 0 )); then
+            printf '%s\n' 'Tracked local-only or sensitive files found:' >&2
+            printf '%s\n' "${violations[@]}" >&2
+            exit 1
+          fi

@@ -1,0 +1,6 @@
+# Copy to .deploy_production.defaults and fill in the real values locally.
+# This example file is safe to commit; the real defaults file is ignored.
+
+VPS_USER=""
+VPS_SUDO_PASSWORD=""
+VPS_SERVER=""

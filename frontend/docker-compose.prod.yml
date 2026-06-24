@@ -1,0 +1,29 @@
+name: git-ranking
+
+services:
+  web:
+    image: git-ranking-web:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - ${APP_ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      PORT: ${APP_PORT:-13000}
+      HOSTNAME: 127.0.0.1
+    network_mode: host
+    restart: unless-stopped
+
+  migrate:
+    image: git-ranking-web:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - ${APP_ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+    network_mode: host
+    command: ["npx", "prisma", "migrate", "deploy"]
+    restart: "no"
